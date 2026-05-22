@@ -150,6 +150,8 @@ export default function Home() {
       fd.append("ageMax", String(formData.ageMax));
       fd.append("dailyBudget", String(formData.dailyBudget));
       fd.append("publishImmediately", String(formData.publishImmediately));
+      fd.append("adAccountId", facebookStatus.selected?.adAccountId ?? "");
+      fd.append("pageId", facebookStatus.selected?.pageId ?? "");
 
       const res = await fetch("/api/create-campaign", {
         method: "POST",

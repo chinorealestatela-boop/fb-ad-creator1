@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createFullCampaign } from "@/app/lib/meta";
+import { normalizeAdAccountId } from "@/app/lib/facebook";
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,6 +29,10 @@ export async function POST(req: NextRequest) {
     const ageMax = parseInt(formData.get("ageMax") as string, 10);
     const dailyBudget = parseFloat(formData.get("dailyBudget") as string);
     const publishImmediately = formData.get("publishImmediately") === "true";
+    const selectedAdAccountId = normalizeAdAccountId(
+      (formData.get("adAccountId") as string | null) || ""
+    );
+    const selectedPageId = (formData.get("pageId") as string | null) || "";
 
     const interests = JSON.parse(interestsRaw || "[]") as string[];
 
@@ -47,8 +52,8 @@ export async function POST(req: NextRequest) {
       status: publishImmediately ? "ACTIVE" : "PAUSED",
       overrides: {
         accessToken: cookieStore.get("fb_access_token")?.value,
-        adAccountId: cookieStore.get("fb_ad_account_id")?.value,
-        pageId: cookieStore.get("fb_page_id")?.value,
+        adAccountId: selectedAdAccountId || cookieStore.get("fb_ad_account_id")?.value,
+        pageId: selectedPageId || cookieStore.get("fb_page_id")?.value,
       },
     });
 

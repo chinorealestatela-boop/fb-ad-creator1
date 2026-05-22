@@ -21,9 +21,14 @@ export function initMeta(overrides?: MetaOverrides) {
     const pageId = overrides?.pageId || process.env.META_PAGE_ID;
 
   if (!accessToken || !accountIdRaw || !pageId) {
-        throw new Error(
-                "Meta credentials are missing. Connect Facebook and select assets, or set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID, and META_PAGE_ID."
-              );
+    const missing: string[] = [];
+    if (!accessToken) missing.push("access token");
+    if (!accountIdRaw) missing.push("ad account");
+    if (!pageId) missing.push("page");
+
+    throw new Error(
+      `Meta credentials are missing: ${missing.join(", ")}. Connect Facebook and select an Ad Account + Facebook Page, or set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID, and META_PAGE_ID in environment variables.`
+    );
   }
 
   const accountId = normalizeAdAccountId(accountIdRaw);

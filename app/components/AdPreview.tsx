@@ -35,6 +35,14 @@ const CTA_LABELS: Record<string, string> = {
   BOOK_TRAVEL: "Book Now",
 };
 
+function formatUsd(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 export default function AdPreview({
   formData,
   generated,
@@ -142,7 +150,7 @@ export default function AdPreview({
               <Detail label="Campaign" value={generated.campaignName} />
               <Detail label="Ad Set" value={generated.adSetName} />
               <Detail label="Ad" value={generated.adName} />
-              <Detail label="Budget" value={`€${formData.dailyBudget}/day`} />
+              <Detail label="Budget" value={`${formatUsd(formData.dailyBudget)}/day`} />
               <Detail label="Location" value={formData.location} />
               <Detail label="Age" value={`${formData.ageMin}–${formData.ageMax}`} />
             </div>
