@@ -1,27 +1,25 @@
 import Dashboard from "./components/Dashboard";
-import { SAMPLE_PROPERTIES, SAMPLE_BUYERS } from "./lib/sample-data";
-import {
-  buildScoredDeals,
-  buildMarketSummary,
-  attachBuyerMatches,
-  alertDeals,
-} from "./lib/deals";
+import { loadScoredDeals } from "./lib/db/deals-repo";
+import { listBuyers } from "./lib/db/buyers-repo";
+import { buildMarketSummary } from "./lib/deals";
+import { isSupabaseConfigured, isRentcastConfigured } from "./lib/env";
 
-export default function Home() {
-  // Until live data sources (RentCast / MLS / public records) are wired in,
-  // the platform runs on realistic Las Vegas sample data so every feature is
-  // explorable. Swapping in a real feed only changes this data source.
-  const scored = buildScoredDeals(SAMPLE_PROPERTIES);
-  const deals = attachBuyerMatches(scored, SAMPLE_BUYERS);
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  // Reads from Supabase when configured; otherwise computes scored deals from
+  // sample data and serves the in-memory buyer store. Buyer matches and alerts
+  // are computed on the client so they stay reactive to CRM edits.
+  const [scored, buyers] = await Promise.all([loadScoredDeals(), listBuyers()]);
   const summary = buildMarketSummary(scored);
-  const alerts = attachBuyerMatches(alertDeals(scored), SAMPLE_BUYERS);
 
   return (
     <Dashboard
-      deals={deals}
+      initialDeals={scored}
       summary={summary}
-      buyers={SAMPLE_BUYERS}
-      alerts={alerts}
+      initialBuyers={buyers}
+      persisted={isSupabaseConfigured()}
+      liveData={isRentcastConfigured()}
     />
   );
 }

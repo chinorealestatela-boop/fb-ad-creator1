@@ -122,6 +122,18 @@ create table deals (
 create index on deals (score_total desc);
 create index on deals (classification);
 
+-- ---------- Deal snapshots (operational read/write path) -------------------
+-- Fully scored deals stored as JSONB for fast dashboard reads. The normalized
+-- properties/deals tables above are the long-term analytics store; this table
+-- is what the app reads and the scan job upserts.
+create table deal_snapshots (
+  property_id text primary key,
+  score       int,
+  data        jsonb not null,    -- full ScoredDeal (property + analysis + score)
+  scanned_at  timestamptz not null default now()
+);
+create index on deal_snapshots (score desc);
+
 -- ---------- Scan history (diffing) -----------------------------------------
 create table scans (
   id            bigserial primary key,

@@ -31,11 +31,23 @@ npm run dev      # http://localhost:3000
 npm run build    # production build
 ```
 
+## Live data & persistence (Phase 1 — wired)
+
+- **Supabase** (`app/lib/db/`) — buyers and scored-deal snapshots persist to
+  Postgres when configured; otherwise an in-memory fallback keeps the UI fully
+  functional. Schema: `docs/DATABASE_SCHEMA.sql`.
+- **RentCast** (`app/lib/sources/rentcast.ts`) — the **Run Scan** button and
+  `POST /api/scan` pull live Las Vegas listings + comps and score them.
+- **Buyer CRM** — add / edit / delete buyers and their buy boxes from the
+  Buyer Network tab; matches recompute live across every deal.
+
+See `docs/SETUP.md` to connect Supabase + RentCast (both have free tiers).
+
 ## What's next
 
-See `docs/PRD.md` for the full plan and `docs/DATABASE_SCHEMA.sql` for the
-Postgres/Supabase schema. Next steps: wire Supabase + RentCast + Clark County
-public records, then the twice-daily scan job and CMA email delivery.
+CMA generation (Claude) + Gmail delivery to matched buyers; Twilio SMS + push
+alerts; emailed PDF daily report; neighborhood enrichment (crime/schools/flood);
+contractor/rehab module; portfolio tracking. See `docs/PRD.md`.
 
 ## Configuration
 

@@ -1,32 +1,43 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { DealWithMatches, MarketSummary } from "../lib/deals";
-import type { Buyer } from "../lib/types";
+import type { ScoredDeal, Buyer } from "../lib/types";
+import {
+  attachBuyerMatches,
+  buildMarketSummary,
+  isAlertDeal,
+  type DealWithMatches,
+  type MarketSummary,
+} from "../lib/deals";
 import DealCard from "./DealCard";
 import DealList from "./DealList";
 import DealMap from "./DealMap";
 import DealDetail from "./DealDetail";
 import BuyersPanel from "./BuyersPanel";
+import BuyerForm from "./BuyerForm";
 import { currency } from "../lib/format";
 
 type View = "grid" | "list" | "map";
 type Tab = "deals" | "buyers" | "report";
-
-const STRATEGY_FILTERS = ["all", "flip", "wholesale", "rental_hold"] as const;
-type StrategyFilter = (typeof STRATEGY_FILTERS)[number];
+type StrategyFilter = "all" | "flip" | "wholesale" | "rental_hold";
 
 export default function Dashboard({
-  deals,
-  summary,
-  buyers,
-  alerts,
+  initialDeals,
+  summary: initialSummary,
+  initialBuyers,
+  persisted,
+  liveData,
 }: {
-  deals: DealWithMatches[];
+  initialDeals: ScoredDeal[];
   summary: MarketSummary;
-  buyers: Buyer[];
-  alerts: DealWithMatches[];
+  initialBuyers: Buyer[];
+  persisted: boolean;
+  liveData: boolean;
 }) {
+  const [deals, setDeals] = useState<ScoredDeal[]>(initialDeals);
+  const [summary, setSummary] = useState<MarketSummary>(initialSummary);
+  const [buyers, setBuyers] = useState<Buyer[]>(initialBuyers);
+
   const [tab, setTab] = useState<Tab>("deals");
   const [view, setView] = useState<View>("grid");
   const [selected, setSelected] = useState<DealWithMatches | null>(null);
@@ -34,19 +45,105 @@ export default function Dashboard({
   const [hideKillers, setHideKillers] = useState(false);
   const [minScore, setMinScore] = useState(0);
 
+  const [scanning, setScanning] = useState(false);
+  const [banner, setBanner] = useState<string | null>(null);
+
+  // Buyer form state
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingBuyer, setEditingBuyer] = useState<Buyer | null>(null);
+  const [savingBuyer, setSavingBuyer] = useState(false);
+
+  // Matches + alerts recompute whenever deals or buyers change.
+  const dealsWithMatches = useMemo(
+    () => attachBuyerMatches(deals, buyers),
+    [deals, buyers]
+  );
+  const alerts = useMemo(
+    () => dealsWithMatches.filter(isAlertDeal),
+    [dealsWithMatches]
+  );
+
   const filtered = useMemo(() => {
-    return deals.filter((d) => {
+    return dealsWithMatches.filter((d) => {
       if (strategy !== "all" && d.analysis.recommendedStrategy !== strategy)
         return false;
       if (hideKillers && d.property.dealKillers.length > 0) return false;
       if (d.score.total < minScore) return false;
       return true;
     });
-  }, [deals, strategy, hideKillers, minScore]);
+  }, [dealsWithMatches, strategy, hideKillers, minScore]);
+
+  // ---- Scan ----------------------------------------------------------------
+  async function runScan() {
+    setScanning(true);
+    setBanner(null);
+    try {
+      const res = await fetch("/api/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ city: "Las Vegas", state: "NV", maxPrice: 500_000 }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setBanner(json.error ?? "Scan failed.");
+        return;
+      }
+      setDeals(json.deals as ScoredDeal[]);
+      setSummary(buildMarketSummary(json.deals as ScoredDeal[]));
+      setBanner(
+        `Scan complete — ${json.scanned} listings analyzed${
+          json.persisted ? " and saved" : ""
+        }.`
+      );
+    } catch {
+      setBanner("Scan request failed.");
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  // ---- Buyer CRUD ----------------------------------------------------------
+  async function saveBuyer(buyer: Buyer) {
+    setSavingBuyer(true);
+    try {
+      const isEdit = Boolean(editingBuyer);
+      const res = await fetch(
+        isEdit ? `/api/buyers/${buyer.id}` : "/api/buyers",
+        {
+          method: isEdit ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(buyer),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        setBanner(json.error ?? "Could not save buyer.");
+        return;
+      }
+      const saved = json.buyer as Buyer;
+      setBuyers((prev) =>
+        isEdit ? prev.map((b) => (b.id === saved.id ? saved : b)) : [saved, ...prev]
+      );
+      setFormOpen(false);
+      setEditingBuyer(null);
+    } catch {
+      setBanner("Could not save buyer.");
+    } finally {
+      setSavingBuyer(false);
+    }
+  }
+
+  async function deleteBuyer(id: string) {
+    setBuyers((prev) => prev.filter((b) => b.id !== id)); // optimistic
+    try {
+      await fetch(`/api/buyers/${id}`, { method: "DELETE" });
+    } catch {
+      setBanner("Could not delete buyer on the server.");
+    }
+  }
 
   return (
     <main className="min-h-screen" style={{ background: "var(--bg)" }}>
-      {/* Header */}
       <header
         className="sticky top-0 z-30 px-4 md:px-8 py-3 flex items-center gap-3"
         style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)" }}
@@ -71,7 +168,7 @@ export default function Dashboard({
             <button
               key={t}
               onClick={() => setTab(t)}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
               style={{
                 background: tab === t ? "var(--surface-2)" : "transparent",
                 color: tab === t ? "var(--foreground)" : "var(--muted)",
@@ -83,11 +180,16 @@ export default function Dashboard({
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
-          <span className="text-[10px] hidden sm:block" style={{ color: "var(--muted)" }}>
-            Last scan: today 7:00 AM
-          </span>
+          <button
+            onClick={runScan}
+            disabled={scanning}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-60"
+            style={{ background: "var(--accent)" }}
+          >
+            {scanning ? "Scanning…" : "Run Scan"}
+          </button>
           <span
-            className="pill"
+            className="pill hidden sm:inline-flex"
             style={{ background: "rgba(16,185,129,0.15)", color: "var(--accent)" }}
           >
             ● {alerts.length} alerts
@@ -113,31 +215,41 @@ export default function Dashboard({
       </div>
 
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-6">
+        {/* Status banners */}
+        {!liveData && (
+          <div
+            className="card p-3 mb-4 text-xs"
+            style={{ borderColor: "rgba(245,158,11,0.4)", color: "var(--muted)" }}
+          >
+            Running on sample data. Add <code>RENTCAST_API_KEY</code> to pull live Las Vegas listings with
+            “Run Scan”, and Supabase keys to persist them.{" "}
+            {persisted ? "Supabase is connected." : "Supabase not connected — buyers are stored in memory only."}
+          </div>
+        )}
+        {banner && (
+          <div
+            className="card p-3 mb-4 text-xs flex items-center justify-between"
+            style={{ borderColor: "var(--accent)" }}
+          >
+            <span style={{ color: "var(--foreground)" }}>{banner}</span>
+            <button onClick={() => setBanner(null)} style={{ color: "var(--muted)" }}>
+              ✕
+            </button>
+          </div>
+        )}
+
         {tab === "deals" && (
           <>
-            {/* Stat row */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
               <Stat label="Active Deals" value={String(summary.totalDeals)} />
               <Stat label="Gold / Silver" value={`${summary.goldCount} / ${summary.silverCount}`} />
-              <Stat
-                label="Avg Discount"
-                value={`${summary.avgDiscountToMarket}%`}
-                accent
-              />
-              <Stat
-                label="Total Proj. Profit"
-                value={currency(summary.totalProjectedProfit, true)}
-                accent
-              />
+              <Stat label="Avg Discount" value={`${summary.avgDiscountToMarket}%`} accent />
+              <Stat label="Total Proj. Profit" value={currency(summary.totalProjectedProfit, true)} accent />
               <Stat label="New Today" value={String(summary.newToday)} />
             </div>
 
-            {/* Alerts */}
             {alerts.length > 0 && (
-              <div
-                className="card p-4 mb-5"
-                style={{ borderColor: "rgba(16,185,129,0.4)" }}
-              >
+              <div className="card p-4 mb-5" style={{ borderColor: "rgba(16,185,129,0.4)" }}>
                 <div className="flex items-center gap-2 mb-2">
                   <span style={{ color: "var(--accent)" }}>⚡</span>
                   <h2 className="text-sm font-semibold text-white">
@@ -223,7 +335,6 @@ export default function Dashboard({
               </span>
             </div>
 
-            {/* Views */}
             {filtered.length === 0 ? (
               <div className="card p-10 text-center text-sm" style={{ color: "var(--muted)" }}>
                 No deals match the current filters.
@@ -242,12 +353,39 @@ export default function Dashboard({
           </>
         )}
 
-        {tab === "buyers" && <BuyersPanel buyers={buyers} deals={deals} onOpen={setSelected} />}
+        {tab === "buyers" && (
+          <BuyersPanel
+            buyers={buyers}
+            deals={dealsWithMatches}
+            onOpen={setSelected}
+            onAdd={() => {
+              setEditingBuyer(null);
+              setFormOpen(true);
+            }}
+            onEdit={(b) => {
+              setEditingBuyer(b);
+              setFormOpen(true);
+            }}
+            onDelete={deleteBuyer}
+          />
+        )}
 
-        {tab === "report" && <DailyReport summary={summary} deals={deals} />}
+        {tab === "report" && <DailyReport summary={summary} deals={dealsWithMatches} />}
       </div>
 
       <DealDetail deal={selected} onClose={() => setSelected(null)} />
+
+      {formOpen && (
+        <BuyerForm
+          initial={editingBuyer}
+          saving={savingBuyer}
+          onSave={saveBuyer}
+          onClose={() => {
+            setFormOpen(false);
+            setEditingBuyer(null);
+          }}
+        />
+      )}
     </main>
   );
 }
@@ -258,10 +396,7 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
       <div className="text-[10px] uppercase tracking-wide" style={{ color: "var(--muted)" }}>
         {label}
       </div>
-      <div
-        className="text-lg font-bold mt-0.5"
-        style={{ color: accent ? "var(--accent)" : "var(--foreground)" }}
-      >
+      <div className="text-lg font-bold mt-0.5" style={{ color: accent ? "var(--accent)" : "var(--foreground)" }}>
         {value}
       </div>
     </div>
@@ -279,9 +414,7 @@ function DailyReport({
   return (
     <div className="space-y-5">
       <div className="card p-5">
-        <h2 className="text-base font-semibold text-white mb-1">
-          Las Vegas Daily Market Report
-        </h2>
+        <h2 className="text-base font-semibold text-white mb-1">Las Vegas Daily Market Report</h2>
         <p className="text-xs mb-4" style={{ color: "var(--muted)" }}>
           Generated {new Date().toLocaleDateString()} · Morning scan
         </p>
@@ -293,11 +426,7 @@ function DailyReport({
           <Stat label="Gold Deals" value={String(summary.goldCount)} accent />
           <Stat label="Silver Deals" value={String(summary.silverCount)} />
           <Stat label="Bronze Deals" value={String(summary.bronzeCount)} />
-          <Stat
-            label="Total Proj. Profit"
-            value={currency(summary.totalProjectedProfit, true)}
-            accent
-          />
+          <Stat label="Total Proj. Profit" value={currency(summary.totalProjectedProfit, true)} accent />
         </div>
       </div>
 

@@ -63,17 +63,22 @@ export function buildMarketSummary(deals: ScoredDeal[]): MarketSummary {
   };
 }
 
-// Deals that should trigger an immediate alert per the investor's alert rules.
-export function alertDeals(deals: ScoredDeal[]): ScoredDeal[] {
-  return deals.filter(
-    (d) =>
-      d.score.total >= 90 ||
-      d.analysis.discountToMarketPct >= 25 ||
-      d.analysis.estimatedNetProfit >= 100_000 ||
-      d.property.distressSignals.some((s) =>
-        ["foreclosure", "pre_foreclosure", "probate"].includes(s)
-      )
+// Per the investor's alert rules: score >=90, 25%+ below market, ARV spread
+// > $100k, or a foreclosure/pre-foreclosure/probate signal.
+export function isAlertDeal(d: ScoredDeal): boolean {
+  return (
+    d.score.total >= 90 ||
+    d.analysis.discountToMarketPct >= 25 ||
+    d.analysis.estimatedNetProfit >= 100_000 ||
+    d.property.distressSignals.some((s) =>
+      ["foreclosure", "pre_foreclosure", "probate"].includes(s)
+    )
   );
+}
+
+// Deals that should trigger an immediate alert.
+export function alertDeals(deals: ScoredDeal[]): ScoredDeal[] {
+  return deals.filter(isAlertDeal);
 }
 
 export interface DealWithMatches extends ScoredDeal {

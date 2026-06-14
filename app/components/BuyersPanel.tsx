@@ -14,21 +14,36 @@ export default function BuyersPanel({
   buyers,
   deals,
   onOpen,
+  onAdd,
+  onEdit,
+  onDelete,
 }: {
   buyers: Buyer[];
   deals: DealWithMatches[];
   onOpen: (deal: DealWithMatches) => void;
+  onAdd: () => void;
+  onEdit: (buyer: Buyer) => void;
+  onDelete: (id: string) => void;
 }) {
   const [openBuyer, setOpenBuyer] = useState<string | null>(buyers[0]?.id ?? null);
 
   return (
     <div className="space-y-4">
-      <div className="card p-4">
-        <h2 className="text-sm font-semibold text-white mb-1">Buyer Network</h2>
-        <p className="text-xs" style={{ color: "var(--muted)" }}>
-          {buyers.length} investor partners on your list. Each deal is matched against every buy box;
-          strong matches (≥70%) trigger an auto-generated CMA email.
-        </p>
+      <div className="card p-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-white mb-1">Buyer Network</h2>
+          <p className="text-xs" style={{ color: "var(--muted)" }}>
+            {buyers.length} investor partners on your list. Each deal is matched against every buy box;
+            strong matches (≥70%) trigger an auto-generated CMA email.
+          </p>
+        </div>
+        <button
+          onClick={onAdd}
+          className="shrink-0 px-3 py-2 rounded-lg text-xs font-semibold text-white"
+          style={{ background: "var(--accent)" }}
+        >
+          + Add Buyer
+        </button>
       </div>
 
       {buyers.map((buyer) => {
@@ -105,6 +120,25 @@ export default function BuyersPanel({
                   </p>
                 )}
 
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => onEdit(buyer)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                    style={{ background: "var(--surface-2)", color: "var(--foreground)", border: "1px solid var(--border)" }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm(`Remove ${buyer.name} from your buyer list?`)) onDelete(buyer.id);
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                    style={{ background: "rgba(239,68,68,0.12)", color: "#fca5a5", border: "1px solid rgba(239,68,68,0.3)" }}
+                  >
+                    Delete
+                  </button>
+                </div>
+
                 {/* Matched deals */}
                 <div>
                   <h4 className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--muted)" }}>
@@ -158,8 +192,8 @@ export default function BuyersPanel({
 
       <div className="card p-4 text-center">
         <p className="text-xs" style={{ color: "var(--muted)" }}>
-          + Adding a new buyer (name, contact, and buy box) is the next build step. Buyer profiles will be
-          stored in the database so the AI matches every future scan against them automatically.
+          Buyers are matched against every scan automatically. Connect Supabase to store them durably;
+          until then they persist in the server&apos;s memory for the session.
         </p>
       </div>
     </div>
