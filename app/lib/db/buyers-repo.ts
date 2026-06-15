@@ -100,12 +100,16 @@ function buyerToRow(b: Buyer): BuyerRow {
 export async function listBuyers(): Promise<Buyer[]> {
   const sb = getSupabase();
   if (!sb) return memStore().slice();
-  const { data, error } = await sb
-    .from(TABLE)
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
-  return (data as BuyerRow[]).map(rowToBuyer);
+  try {
+    const { data, error } = await sb
+      .from(TABLE)
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data as BuyerRow[]).map(rowToBuyer);
+  } catch {
+    return memStore().slice();
+  }
 }
 
 export async function createBuyer(buyer: Buyer): Promise<Buyer> {

@@ -15,15 +15,20 @@ export async function loadScoredDeals(): Promise<ScoredDeal[]> {
   const sb = getSupabase();
   if (!sb) return buildScoredDeals(SAMPLE_PROPERTIES);
 
-  const { data, error } = await sb
-    .from(TABLE)
-    .select("data")
-    .order("score", { ascending: false });
-  if (error) throw new Error(error.message);
+  try {
+    const { data, error } = await sb
+      .from(TABLE)
+      .select("data")
+      .order("score", { ascending: false });
+    if (error) throw new Error(error.message);
 
-  const deals = (data ?? []).map((r) => (r as { data: ScoredDeal }).data);
-  // Empty DB (never scanned yet) -> show sample data so the UI isn't blank.
-  return deals.length > 0 ? deals : buildScoredDeals(SAMPLE_PROPERTIES);
+    const deals = (data ?? []).map((r) => (r as { data: ScoredDeal }).data);
+    // Empty DB (never scanned yet) -> show sample data so the UI isn't blank.
+    return deals.length > 0 ? deals : buildScoredDeals(SAMPLE_PROPERTIES);
+  } catch {
+    // Network unreachable (e.g. egress restrictions in dev) — use sample data.
+    return buildScoredDeals(SAMPLE_PROPERTIES);
+  }
 }
 
 export async function saveScoredDeals(deals: ScoredDeal[]): Promise<void> {
