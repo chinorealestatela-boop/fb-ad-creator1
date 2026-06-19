@@ -1,5 +1,5 @@
 @echo off
-title Content Empire AI — Setup & Launch
+title Content Empire AI — Setup
 color 0A
 
 echo.
@@ -8,68 +8,106 @@ echo   Content Empire AI — Auto Setup
 echo  ==========================================
 echo.
 
-:: Check if git is installed
+:: ── Check Git ──────────────────────────────
+echo  Checking for Git...
 where git >nul 2>nul
 if %errorlevel% neq 0 (
-    echo  ERROR: Git is not installed.
-    echo  Download it from: https://git-scm.com/download/win
+    echo.
+    echo  *** ERROR: Git is NOT installed ***
+    echo.
+    echo  Please install Git first:
+    echo  https://git-scm.com/download/win
+    echo.
+    echo  After installing Git, close this window and double-click START.bat again.
+    echo.
     pause
     exit /b 1
 )
+echo  Git found OK.
 
-:: Check if node is installed
+:: ── Check Node ─────────────────────────────
+echo  Checking for Node.js...
 where node >nul 2>nul
 if %errorlevel% neq 0 (
-    echo  ERROR: Node.js is not installed.
-    echo  Download it from: https://nodejs.org
+    echo.
+    echo  *** ERROR: Node.js is NOT installed ***
+    echo.
+    echo  Please install Node.js first:
+    echo  https://nodejs.org  (click the LTS button)
+    echo.
+    echo  After installing Node.js, close this window and double-click START.bat again.
+    echo.
+    pause
+    exit /b 1
+)
+echo  Node.js found OK.
+echo.
+
+:: ── Clone or update repo ────────────────────
+if exist "fb-ad-creator1\content-empire-ai\package.json" (
+    echo  Project folder already exists. Updating...
+    cd fb-ad-creator1
+    git checkout claude/content-empire-ai-o296rg 2>nul
+    git pull origin claude/content-empire-ai-o296rg
+    echo  Update complete.
+) else (
+    echo  Downloading Content Empire AI from GitHub...
+    git clone https://github.com/chinorealestatela-boop/fb-ad-creator1.git
+    if %errorlevel% neq 0 (
+        echo.
+        echo  *** ERROR: Could not download the project ***
+        echo  Check your internet connection and try again.
+        echo.
+        pause
+        exit /b 1
+    )
+    cd fb-ad-creator1
+    git checkout claude/content-empire-ai-o296rg
+)
+
+:: ── Enter app folder ────────────────────────
+cd content-empire-ai
+echo.
+echo  Entered: %CD%
+echo.
+
+:: ── Env file ───────────────────────────────
+if not exist ".env.local" (
+    copy .env.example .env.local >nul
+)
+
+:: ── Install packages ───────────────────────
+echo  Installing packages (takes 1-3 minutes the first time)...
+echo  Please wait — do NOT close this window...
+echo.
+call npm install
+if %errorlevel% neq 0 (
+    echo.
+    echo  *** ERROR: npm install failed ***
+    echo  Try running this window as Administrator.
+    echo.
     pause
     exit /b 1
 )
 
-echo  [1/5] Checking if repo already exists...
-
-if exist "fb-ad-creator1\content-empire-ai" (
-    echo  Repo found. Pulling latest changes...
-    cd fb-ad-creator1
-    git fetch origin
-    git checkout claude/content-empire-ai-o296rg
-    git pull origin claude/content-empire-ai-o296rg
-) else (
-    echo  [1/5] Cloning repository...
-    git clone https://github.com/chinorealestatela-boop/fb-ad-creator1.git
-    cd fb-ad-creator1
-    git checkout claude/content-empire-ai-o296rg
-)
-
-echo.
-echo  [2/5] Entering Content Empire AI directory...
-cd content-empire-ai
-
-echo.
-echo  [3/5] Setting up environment file...
-if not exist ".env.local" (
-    copy .env.example .env.local >nul
-    echo  Created .env.local
-) else (
-    echo  .env.local already exists — skipping
-)
-
-echo.
-echo  [4/5] Installing dependencies (this may take 1-2 minutes)...
-call npm install
-
-echo.
-echo  [5/5] Starting Content Empire AI...
+:: ── Launch ─────────────────────────────────
 echo.
 echo  ==========================================
-echo   App is running at: http://localhost:3001
-echo   Opening in your browser now...
-echo   Press Ctrl+C to stop the server
+echo.
+echo   SUCCESS! Starting Content Empire AI...
+echo.
+echo   Your browser will open in 5 seconds at:
+echo   http://localhost:3001
+echo.
+echo   Keep this window open while using the app.
+echo   To stop: press Ctrl+C in this window.
+echo.
 echo  ==========================================
 echo.
 
-:: Open browser after 3 seconds
-start "" timeout /t 3 /nobreak >nul & start http://localhost:3001
+:: Wait 5 seconds then open browser
+ping 127.0.0.1 -n 6 >nul
+start http://localhost:3001
 
-:: Start the dev server
-call npm run dev
+:: Start the server (keeps window open)
+npm run dev
