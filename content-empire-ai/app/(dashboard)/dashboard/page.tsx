@@ -12,9 +12,13 @@ export default function DashboardPage() {
   const [connections, setConnections] = useState<Record<string, StoredConnection>>({});
 
   useEffect(() => {
-    const p = getProfile();
-    if (p?.name) setName(p.name.split(" ")[0]);
-    setConnections(getConnections());
+    async function load() {
+      const p = await getProfile();
+      if (p?.name) setName(p.name.split(" ")[0]);
+      const c = await getConnections();
+      setConnections(c);
+    }
+    load();
   }, []);
 
   const connected = Object.entries(connections).filter(([, c]) => c.connected);

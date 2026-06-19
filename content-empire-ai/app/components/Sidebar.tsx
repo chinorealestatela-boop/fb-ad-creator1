@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { getProfile } from "../lib/storage";
+import { supabase } from "../lib/supabase";
 
 const NAV = [
   {
@@ -52,17 +53,25 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [userName, setUserName] = useState("Loading...");
   const [userInitial, setUserInitial] = useState("?");
+  const [userEmail, setUserEmail] = useState("");
 
   useEffect(() => {
-    const p = getProfile();
-    if (p?.name) {
-      setUserName(p.businessName || p.name);
-      setUserInitial((p.businessName || p.name)[0].toUpperCase());
-    } else {
-      setUserName("My Account");
-      setUserInitial("?");
-    }
+    getProfile().then(p => {
+      if (p?.name) {
+        setUserName(p.businessName || p.name);
+        setUserInitial((p.businessName || p.name)[0].toUpperCase());
+        setUserEmail(p.email || "");
+      } else {
+        setUserName("My Account");
+        setUserInitial("?");
+      }
+    });
   }, []);
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  }
 
   return (
     <aside className="sidebar">
@@ -159,9 +168,13 @@ export default function Sidebar() {
             <div className="text-xs font-semibold truncate" style={{ color: "var(--text-primary)" }}>
               {userName}
             </div>
-            <div className="text-xs" style={{ color: "var(--text-muted)" }}>Pro Plan</div>
+            <div className="text-xs truncate" style={{ color: "var(--text-muted)" }}>{userEmail || "Pro Plan"}</div>
           </div>
-          <span style={{ color: "var(--text-muted)", fontSize: 12 }}>⋮</span>
+          <button
+            onClick={signOut}
+            title="Sign out"
+            style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14, padding: "2px 4px", flexShrink: 0 }}
+          >⏻</button>
         </div>
       </div>
     </aside>

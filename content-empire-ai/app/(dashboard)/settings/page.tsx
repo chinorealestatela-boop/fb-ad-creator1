@@ -12,12 +12,11 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<typeof TABS[number]>("Profile");
 
   useEffect(() => {
-    const p = getProfile();
-    if (p) setProfile(p);
+    getProfile().then(p => { if (p) setProfile(p); });
   }, []);
 
-  function save() {
-    saveProfile(profile);
+  async function save() {
+    await saveProfile(profile);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }

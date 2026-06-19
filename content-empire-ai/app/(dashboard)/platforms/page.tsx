@@ -23,26 +23,26 @@ export default function PlatformsPage() {
   const [inputVal, setInputVal] = useState("");
 
   useEffect(() => {
-    setConnections(getConnections());
+    getConnections().then(setConnections);
   }, []);
 
-  function connect() {
+  async function connect() {
     if (!modal || !inputVal.trim()) return;
     const updated = {
       ...connections,
       [modal.id]: { connected: true, username: inputVal.trim(), displayName: inputVal.trim() },
     };
     setConnections(updated);
-    saveConnections(updated);
+    await saveConnections(updated);
     setModal(null);
     setInputVal("");
   }
 
-  function disconnect(id: string) {
+  async function disconnect(id: string) {
     const updated = { ...connections };
     delete updated[id];
     setConnections(updated);
-    saveConnections(updated);
+    await saveConnections(updated);
   }
 
   function openModal(pl: typeof PHASE1[0]) {
