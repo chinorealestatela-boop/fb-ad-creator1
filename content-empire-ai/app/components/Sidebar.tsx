@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
+import { getProfile } from "../lib/storage";
 
 const NAV = [
   {
@@ -48,6 +50,19 @@ const NAV = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [userName, setUserName] = useState("Loading...");
+  const [userInitial, setUserInitial] = useState("?");
+
+  useEffect(() => {
+    const p = getProfile();
+    if (p?.name) {
+      setUserName(p.businessName || p.name);
+      setUserInitial((p.businessName || p.name)[0].toUpperCase());
+    } else {
+      setUserName("My Account");
+      setUserInitial("?");
+    }
+  }, []);
 
   return (
     <aside className="sidebar">
@@ -121,10 +136,10 @@ export default function Sidebar() {
         <div className="mb-3 px-1">
           <div className="flex justify-between mb-1" style={{ fontSize: 11, color: "var(--text-muted)" }}>
             <span>Storage used</span>
-            <span style={{ color: "var(--text-secondary)" }}>24.3 GB / 100 GB</span>
+            <span style={{ color: "var(--text-secondary)" }}>0 GB / 100 GB</span>
           </div>
           <div className="progress-bar">
-            <div className="progress-fill" style={{ width: "24%" }} />
+            <div className="progress-fill" style={{ width: "0%" }} />
           </div>
         </div>
 
@@ -138,11 +153,11 @@ export default function Sidebar() {
             className="w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
             style={{ background: "linear-gradient(135deg, #6c63ff, #ec4899)" }}
           >
-            C
+            {userInitial}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="text-xs font-semibold truncate" style={{ color: "var(--text-primary)" }}>
-              Chino Real Estate
+              {userName}
             </div>
             <div className="text-xs" style={{ color: "var(--text-muted)" }}>Pro Plan</div>
           </div>

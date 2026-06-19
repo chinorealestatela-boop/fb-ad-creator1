@@ -121,7 +121,7 @@ const PLATFORM_LIST: Platform[] = ["instagram", "facebook", "youtube", "tiktok",
 export default function CaptionsPage() {
   const [selectedStyle, setSelectedStyle] = useState<CaptionStyle>("viral");
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>("instagram");
-  const [selectedContent, setSelectedContent] = useState(SAMPLE_CONTENT[0]);
+  const [selectedContent, setSelectedContent] = useState(SAMPLE_CONTENT[0] ?? null);
   const [generating, setGenerating] = useState(false);
   const [caption, setCaption] = useState(GENERATED_CAPTIONS["viral"]);
   const [copied, setCopied] = useState(false);
@@ -154,17 +154,21 @@ export default function CaptionsPage() {
               <h3 className="font-semibold text-xs mb-3" style={{ color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                 Select Content
               </h3>
-              <select
-                className="input input-sm"
-                onChange={e => {
-                  const c = SAMPLE_CONTENT.find(x => x.id === e.target.value);
-                  if (c) setSelectedContent(c);
-                }}
-              >
-                {SAMPLE_CONTENT.slice(0, 12).map(c => (
-                  <option key={c.id} value={c.id}>{c.title.slice(0, 40)}…</option>
-                ))}
-              </select>
+              {SAMPLE_CONTENT.length === 0 ? (
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>No content yet — upload content to your library first.</p>
+              ) : (
+                <select
+                  className="input input-sm"
+                  onChange={e => {
+                    const c = SAMPLE_CONTENT.find(x => x.id === e.target.value);
+                    if (c) setSelectedContent(c);
+                  }}
+                >
+                  {SAMPLE_CONTENT.slice(0, 12).map(c => (
+                    <option key={c.id} value={c.id}>{c.title.slice(0, 40)}…</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {/* Platform */}
@@ -234,19 +238,27 @@ export default function CaptionsPage() {
 
             {/* Content preview + generate */}
             <div className="card p-4 flex items-center gap-4">
-              <div
-                className={`bg-gradient-to-br ${selectedContent.thumbnailGradient} rounded-xl flex-shrink-0`}
-                style={{ width: 70, height: 54, display: "flex", alignItems: "center", justifyContent: "center" }}
-              >
-                <span style={{ fontSize: 24, color: "white" }}>▶</span>
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p className="font-semibold text-sm truncate" style={{ color: "var(--text-primary)" }}>{selectedContent.title}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="badge badge-purple">{selectedContent.category}</span>
-                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>Viral score: {selectedContent.viralScore}/100</span>
+              {selectedContent ? (
+                <>
+                  <div
+                    className={`bg-gradient-to-br ${selectedContent.thumbnailGradient} rounded-xl flex-shrink-0`}
+                    style={{ width: 70, height: 54, display: "flex", alignItems: "center", justifyContent: "center" }}
+                  >
+                    <span style={{ fontSize: 24, color: "white" }}>▶</span>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p className="font-semibold text-sm truncate" style={{ color: "var(--text-primary)" }}>{selectedContent.title}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="badge badge-purple">{selectedContent.category}</span>
+                      <span className="text-xs" style={{ color: "var(--text-muted)" }}>Viral score: {selectedContent.viralScore}/100</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div style={{ flex: 1 }}>
+                  <p className="text-sm" style={{ color: "var(--text-secondary)" }}>Upload content to generate captions from your library.</p>
                 </div>
-              </div>
+              )}
               <button
                 className="btn btn-gradient"
                 onClick={generate}
@@ -311,7 +323,7 @@ export default function CaptionsPage() {
             <div className="card p-4">
               <h3 className="font-semibold text-sm mb-3" style={{ color: "var(--text-primary)" }}>AI Hashtag Suggestions</h3>
               <div className="flex flex-wrap gap-2">
-                {(selectedContent.aiAnalysis?.suggestedHashtags ?? ["#realestate", "#losangeles", "#homebuying", "#realtor", "#investment", "#property", "#luxuryhomes", "#firsttimehomebuyer"]).map(tag => (
+                {(selectedContent?.aiAnalysis?.suggestedHashtags ?? ["#realestate", "#losangeles", "#homebuying", "#realtor", "#investment", "#property", "#luxuryhomes", "#firsttimehomebuyer"]).map(tag => (
                   <button
                     key={tag}
                     className="badge badge-gray"
