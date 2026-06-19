@@ -1,194 +1,154 @@
 "use client";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Header from "../../components/Header";
-import { PLATFORM_CONNECTIONS } from "../../lib/data";
-import { PLATFORM_META } from "../../lib/utils";
-import type { Platform, PlatformConnection } from "../../lib/types";
+import { getConnections, saveConnections, type StoredConnection } from "../../lib/storage";
+
+const PHASE1 = [
+  { id: "instagram", name: "Instagram", icon: "📸", color: "linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)", label: "Instagram Username", placeholder: "@yourusername",  hint: "Your @handle as it appears on Instagram."                },
+  { id: "facebook",  name: "Facebook",  icon: "👥", color: "#1877f2",                                                           label: "Facebook Page Name", placeholder: "Your Page Name", hint: "The name of your Facebook Business Page."               },
+  { id: "youtube",   name: "YouTube",   icon: "▶️", color: "#ff0000",                                                           label: "Channel Name",       placeholder: "Your Channel Name", hint: "Your YouTube channel name."                          },
+  { id: "tiktok",    name: "TikTok",    icon: "🎵", color: "linear-gradient(135deg,#010101,#69c9d0)",                           label: "TikTok Username",    placeholder: "@yourusername",  hint: "Your @handle as it appears on TikTok."                },
+];
+
+const PHASE2 = [
+  { id: "linkedin",  name: "LinkedIn",  icon: "💼" },
+  { id: "twitter",   name: "Twitter/X", icon: "🐦" },
+  { id: "pinterest", name: "Pinterest", icon: "📌" },
+  { id: "threads",   name: "Threads",   icon: "🧵" },
+];
 
 export default function PlatformsPage() {
-  const [connections, setConnections] = useState<PlatformConnection[]>(PLATFORM_CONNECTIONS);
-  const [connecting, setConnecting] = useState<Platform | null>(null);
+  const [connections, setConnections] = useState<Record<string, StoredConnection>>({});
+  const [modal, setModal] = useState<typeof PHASE1[0] | null>(null);
+  const [inputVal, setInputVal] = useState("");
 
-  function connect(platform: Platform) {
-    setConnecting(platform);
-    setTimeout(() => {
-      setConnections(prev => prev.map(c =>
-        c.platform === platform
-          ? { ...c, connected: true, accountName: `@demo_${platform}`, followers: Math.floor(Math.random() * 10000 + 1000), lastSync: new Date().toISOString() }
-          : c
-      ));
-      setConnecting(null);
-    }, 2000);
+  useEffect(() => {
+    setConnections(getConnections());
+  }, []);
+
+  function connect() {
+    if (!modal || !inputVal.trim()) return;
+    const updated = {
+      ...connections,
+      [modal.id]: { connected: true, username: inputVal.trim(), displayName: inputVal.trim() },
+    };
+    setConnections(updated);
+    saveConnections(updated);
+    setModal(null);
+    setInputVal("");
   }
 
-  function disconnect(platform: Platform) {
-    setConnections(prev => prev.map(c =>
-      c.platform === platform
-        ? { platform, connected: false }
-        : c
-    ));
+  function disconnect(id: string) {
+    const updated = { ...connections };
+    delete updated[id];
+    setConnections(updated);
+    saveConnections(updated);
   }
 
-  const connected = connections.filter(c => c.connected);
-  const notConnected = connections.filter(c => !c.connected);
-
-  const PLATFORM_PHASES: Record<Platform, string> = {
-    instagram: "Phase 1",
-    facebook: "Phase 1",
-    youtube: "Phase 1",
-    tiktok: "Phase 2",
-    linkedin: "Phase 2",
-    twitter: "Phase 2",
-    pinterest: "Phase 2",
-    threads: "Phase 3",
-  };
+  function openModal(pl: typeof PHASE1[0]) {
+    setInputVal(connections[pl.id]?.username || "");
+    setModal(pl);
+  }
 
   return (
     <>
-      <Header
-        title="Platforms"
-        subtitle="Connect and manage your social media accounts"
-      />
+      <Header title="Platforms" subtitle="Manage your connected social media accounts" />
       <div className="page-body fade-in">
 
-        {/* Summary */}
-        <div className="grid gap-4 mb-6" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
-          <div className="stat-card">
-            <div className="text-xs uppercase font-semibold mb-2" style={{ color: "var(--text-muted)" }}>Connected</div>
-            <div className="font-black" style={{ fontSize: 28, color: "#10b981" }}>{connected.length}</div>
-            <div className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>platforms active</div>
-          </div>
-          <div className="stat-card">
-            <div className="text-xs uppercase font-semibold mb-2" style={{ color: "var(--text-muted)" }}>Total Followers</div>
-            <div className="font-black" style={{ fontSize: 28, color: "var(--accent-light)" }}>
-              {(connected.reduce((a, c) => a + (c.followers ?? 0), 0) / 1000).toFixed(1)}K
+        {/* Connect modal */}
+        {modal && (
+          <>
+            <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 50, backdropFilter: "blur(4px)" }} onClick={() => setModal(null)} />
+            <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 420, background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 16, padding: 28, zIndex: 51, boxShadow: "0 24px 60px rgba(0,0,0,0.5)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: modal.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>{modal.icon}</div>
+                <div>
+                  <div className="font-bold" style={{ color: "var(--text-primary)", fontSize: 16 }}>Connect {modal.name}</div>
+                  <div className="text-xs" style={{ color: "var(--text-muted)" }}>Enter your account details below</div>
+                </div>
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <label className="text-xs font-semibold block mb-1.5" style={{ color: "var(--text-secondary)" }}>{modal.label}</label>
+                <input
+                  className="input"
+                  placeholder={modal.placeholder}
+                  value={inputVal}
+                  onChange={e => setInputVal(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && connect()}
+                  autoFocus
+                />
+                <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>{modal.hint}</p>
+              </div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button className="btn btn-outline flex-1" onClick={() => setModal(null)}>Cancel</button>
+                <button className="btn btn-gradient flex-1" style={{ justifyContent: "center" }} disabled={!inputVal.trim()} onClick={connect}>
+                  Connect {modal.name}
+                </button>
+              </div>
             </div>
-            <div className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>across all accounts</div>
-          </div>
-          <div className="stat-card">
-            <div className="text-xs uppercase font-semibold mb-2" style={{ color: "var(--text-muted)" }}>Publishing To</div>
-            <div className="font-black" style={{ fontSize: 28, color: "#f59e0b" }}>{connected.length}</div>
-            <div className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>platforms auto-publishing</div>
+          </>
+        )}
+
+        {/* Phase 1 — Available Now */}
+        <div className="mb-8">
+          <h3 className="font-bold mb-4" style={{ color: "var(--text-primary)", fontSize: 16 }}>
+            Available Now
+            <span className="badge badge-green ml-2" style={{ fontSize: 11 }}>Phase 1</span>
+          </h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {PHASE1.map(pl => {
+              const conn = connections[pl.id];
+              return (
+                <div key={pl.id} className="card p-5 flex items-center gap-4">
+                  <div style={{ width: 48, height: 48, borderRadius: 12, flexShrink: 0, background: pl.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>
+                    {pl.icon}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="font-semibold" style={{ color: "var(--text-primary)" }}>{pl.name}</div>
+                    {conn?.connected ? (
+                      <div className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>{conn.username}</div>
+                    ) : (
+                      <div className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>Not connected</div>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    {conn?.connected && <span className="badge badge-green">Connected</span>}
+                    {conn?.connected ? (
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button className="btn btn-outline btn-sm" onClick={() => openModal(pl)}>Edit</button>
+                        <button className="btn btn-sm" style={{ background: "rgba(239,68,68,0.12)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.25)" }} onClick={() => disconnect(pl.id)}>Disconnect</button>
+                      </div>
+                    ) : (
+                      <button className="btn btn-gradient btn-sm" onClick={() => openModal(pl)}>Connect</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* Connected */}
-        {connected.length > 0 && (
-          <div className="mb-6">
-            <h3 className="font-bold text-sm mb-4" style={{ color: "var(--text-primary)" }}>
-              Connected Platforms
-            </h3>
-            <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))" }}>
-              {connected.map(conn => {
-                const meta = PLATFORM_META[conn.platform];
-                const phase = PLATFORM_PHASES[conn.platform];
-                return (
-                  <div key={conn.platform} className="card card-hover p-5">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <span className={`platform-icon ${meta.cssClass}`} style={{ width: 36, height: 36, fontSize: 14, borderRadius: 9 }}>
-                          {meta.abbr}
-                        </span>
-                        <div>
-                          <div className="font-bold text-sm" style={{ color: "var(--text-primary)" }}>{meta.label}</div>
-                          <div className="text-xs" style={{ color: "var(--text-muted)" }}>{conn.accountName}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#10b981", display: "inline-block" }} />
-                        <span className="text-xs" style={{ color: "#10b981", fontWeight: 600 }}>Connected</span>
-                      </div>
-                    </div>
-
-                    <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-                      <div className="rounded-lg p-3 text-center" style={{ background: "var(--surface-2)" }}>
-                        <div className="font-bold text-sm" style={{ color: "var(--text-primary)" }}>
-                          {((conn.followers ?? 0) / 1000).toFixed(1)}K
-                        </div>
-                        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Followers</div>
-                      </div>
-                      <div className="rounded-lg p-3 text-center" style={{ background: "var(--surface-2)" }}>
-                        <div className="font-bold text-sm" style={{ color: "#10b981" }}>Active</div>
-                        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Publishing</div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                        Last sync: {new Date(conn.lastSync ?? "").toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                      </span>
-                      <div className="flex gap-2">
-                        <button className="btn btn-ghost btn-xs">↻ Sync</button>
-                        <button className="btn btn-xs" style={{ background: "rgba(239,68,68,0.12)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.25)" }}
-                          onClick={() => disconnect(conn.platform)}>
-                          Disconnect
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+        {/* Phase 2 — Coming Soon */}
+        <div>
+          <h3 className="font-bold mb-4" style={{ color: "var(--text-primary)", fontSize: 16 }}>
+            Coming Soon
+            <span className="badge badge-gray ml-2" style={{ fontSize: 11 }}>Phase 2</span>
+          </h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {PHASE2.map(pl => (
+              <div key={pl.id} className="card p-5 flex items-center gap-4" style={{ opacity: 0.5 }}>
+                <div style={{ width: 48, height: 48, borderRadius: 12, flexShrink: 0, background: "var(--surface-3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>
+                  {pl.icon}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div className="font-semibold" style={{ color: "var(--text-primary)" }}>{pl.name}</div>
+                  <div className="text-sm" style={{ color: "var(--text-muted)" }}>Coming in Phase 2</div>
+                </div>
+                <span className="badge badge-gray">Coming Soon</span>
+              </div>
+            ))}
           </div>
-        )}
-
-        {/* Not connected */}
-        {notConnected.length > 0 && (
-          <div>
-            <h3 className="font-bold text-sm mb-4" style={{ color: "var(--text-primary)" }}>
-              Available Platforms
-            </h3>
-            <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px,1fr))" }}>
-              {notConnected.map(conn => {
-                const meta = PLATFORM_META[conn.platform];
-                const phase = PLATFORM_PHASES[conn.platform];
-                const isConnecting = connecting === conn.platform;
-                const isPhase1 = phase === "Phase 1";
-                return (
-                  <div
-                    key={conn.platform}
-                    className="card p-5"
-                    style={{ opacity: isPhase1 ? 1 : 0.7 }}
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <span className={`platform-icon ${meta.cssClass}`} style={{ width: 36, height: 36, fontSize: 14, borderRadius: 9, opacity: isPhase1 ? 1 : 0.5 }}>
-                          {meta.abbr}
-                        </span>
-                        <div>
-                          <div className="font-bold text-sm" style={{ color: "var(--text-primary)" }}>{meta.label}</div>
-                          <span className={`badge ${isPhase1 ? "badge-purple" : "badge-gray"}`}>{phase}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <p className="text-xs mb-4" style={{ color: "var(--text-secondary)" }}>
-                      {isPhase1
-                        ? `Connect your ${meta.label} account to start auto-publishing content.`
-                        : `${meta.label} integration coming soon in ${phase}.`}
-                    </p>
-
-                    <button
-                      className={`btn ${isPhase1 ? "btn-primary" : "btn-outline"} w-full`}
-                      style={{ justifyContent: "center", width: "100%" }}
-                      disabled={!isPhase1 || isConnecting}
-                      onClick={() => isPhase1 && connect(conn.platform)}
-                    >
-                      {isConnecting ? (
-                        <><span className="spin">◌</span> Connecting…</>
-                      ) : isPhase1 ? (
-                        `Connect ${meta.label}`
-                      ) : (
-                        "Coming Soon"
-                      )}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </>
   );
