@@ -97,7 +97,7 @@ echo.
 echo   SUCCESS! Starting Content Empire AI...
 echo.
 echo   Your browser will open in 5 seconds at:
-echo   http://localhost:3001
+echo   http://localhost:3002
 echo.
 echo   Keep this window open while using the app.
 echo   To stop: press Ctrl+C in this window.
@@ -107,7 +107,7 @@ echo.
 
 :: Wait 5 seconds then open browser
 ping 127.0.0.1 -n 6 >nul
-start http://localhost:3001
+start http://localhost:3002
 
 :: Start the server (keeps window open)
 npm run dev
