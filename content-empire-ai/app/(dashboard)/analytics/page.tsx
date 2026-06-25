@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import Header from "../../components/Header";
 import { supabase } from "../../lib/supabase";
 import { formatNumber } from "../../lib/utils";
+import { DASHBOARD_STATS, PLATFORM_CONNECTIONS, SAMPLE_ANALYTICS, SAMPLE_CONTENT } from "../../lib/data";
 
 type PlatformData = {
   connected: boolean;
@@ -41,6 +42,36 @@ const PLATFORM_STYLE: Record<string, { label: string; icon: string; color: strin
   tiktok:    { label: "TikTok",     icon: "🎵", color: "#69c9d0" },
 };
 
+const DEMO_ANALYTICS: Analytics = {
+  instagram: {
+    connected: true,
+    username: "chinorealestatela",
+    displayName: "Chino Real Estate LA",
+    followers: 42800,
+    posts: 289,
+  },
+  facebook: {
+    connected: true,
+    username: "Chino Real Estate LA",
+    followers: 8200,
+  },
+  youtube: {
+    connected: true,
+    username: "chinorealestatela",
+    displayName: "Chino Real Estate LA",
+    subscribers: 28500,
+    totalViews: 9480000,
+    videoCount: 312,
+  },
+  tiktok: {
+    connected: true,
+    username: "chinorealestatela",
+    followers: 6300,
+    likes: 847000,
+    videos: 198,
+  },
+};
+
 function StatBox({ label, value }: { label: string; value: string | number }) {
   return (
     <div>
@@ -52,16 +83,62 @@ function StatBox({ label, value }: { label: string; value: string | number }) {
   );
 }
 
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function MiniChart({ data }: { data: { date: string; views: number }[] }) {
+  const last30 = data.slice(-30);
+  const maxViews = Math.max(...last30.map(d => d.views));
+  const barWidth = 100 / last30.length;
+
+  return (
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 60, padding: "0 4px" }}>
+      {last30.map((d, i) => {
+        const h = maxViews > 0 ? (d.views / maxViews) * 100 : 0;
+        const isSpike = d.views > maxViews * 0.7;
+        return (
+          <div
+            key={i}
+            title={`${d.date}: ${formatNumber(d.views)} views`}
+            style={{
+              flex: 1,
+              height: `${Math.max(h, 4)}%`,
+              background: isSpike
+                ? "linear-gradient(180deg,#f59e0b,#f97316)"
+                : "linear-gradient(180deg,#6c63ff,#ec4899)",
+              borderRadius: 2,
+              opacity: 0.85,
+              transition: "height 0.3s",
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AnalyticsPage() {
   const [analytics, setAnalytics] = useState<Analytics>({});
   const [loading, setLoading] = useState(true);
+  const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
-      const res = await fetch(`/api/analytics?userId=${user.id}`);
-      const data = await res.json();
-      setAnalytics(data);
+      try {
+        const res = await fetch(`/api/analytics?userId=${user.id}`);
+        const data = await res.json();
+        const hasReal = Object.values(data).some((d: any) => d?.connected);
+        if (hasReal) {
+          setAnalytics(data);
+          setIsDemo(false);
+        } else {
+          setAnalytics(DEMO_ANALYTICS);
+          setIsDemo(true);
+        }
+      } catch {
+        setAnalytics(DEMO_ANALYTICS);
+        setIsDemo(true);
+      }
       setLoading(false);
     });
   }, []);
@@ -86,39 +163,30 @@ export default function AnalyticsPage() {
     );
   }
 
-  if (connectedPlatforms.length === 0) {
-    return (
-      <>
-        <Header title="Analytics" subtitle="Real data from your connected platforms" />
-        <div className="page-body fade-in">
-          <div className="card p-10" style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
-            <h3 style={{ fontSize: 20, fontWeight: 900, color: "var(--text-primary)", marginBottom: 8 }}>
-              No platforms connected yet
-            </h3>
-            <p style={{ color: "var(--text-secondary)", marginBottom: 24, fontSize: 14 }}>
-              Connect Instagram, Facebook, YouTube, or TikTok to see your real analytics here.
-            </p>
-            <a href="/platforms" className="btn btn-gradient" style={{ display: "inline-flex", textDecoration: "none" }}>
-              Connect Platforms →
-            </a>
-          </div>
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
       <Header title="Analytics" subtitle="Live data pulled directly from your connected platforms" />
       <div className="page-body fade-in">
 
+        {/* Demo mode banner */}
+        {isDemo && (
+          <div className="card p-4 mb-6 flex items-center gap-3" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)" }}>
+            <span style={{ fontSize: 20 }}>✨</span>
+            <div style={{ flex: 1 }}>
+              <div className="font-semibold text-sm" style={{ color: "#f59e0b" }}>Demo Preview — Connect platforms to see your real data</div>
+              <div className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                Showing sample analytics for a real estate content creator. <a href="/platforms" style={{ color: "#f59e0b", textDecoration: "underline" }}>Connect Instagram, YouTube, or TikTok →</a>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Summary KPIs */}
         <div className="grid gap-4 mb-6" style={{ gridTemplateColumns: "repeat(4,1fr)" }}>
           <div className="card p-5">
             <div className="text-xs uppercase font-semibold mb-2" style={{ color: "var(--text-muted)", letterSpacing: "0.07em" }}>Total Followers</div>
-            <div style={{ fontSize: 28, fontWeight: 900, color: "var(--text-primary)" }}>{formatNumber(totalFollowers)}</div>
-            <div className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>Across {connectedPlatforms.length} platform{connectedPlatforms.length !== 1 ? "s" : ""}</div>
+            <div style={{ fontSize: 28, fontWeight: 900, color: "var(--text-primary)" }}>{formatNumber(isDemo ? DASHBOARD_STATS.totalFollowers : totalFollowers)}</div>
+            <div className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>Across {connectedPlatforms.length} platforms</div>
           </div>
           <div className="card p-5">
             <div className="text-xs uppercase font-semibold mb-2" style={{ color: "var(--text-muted)", letterSpacing: "0.07em" }}>YouTube Views</div>
@@ -143,6 +211,21 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
+        {/* Views over time chart */}
+        <div className="card p-5 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold" style={{ color: "var(--text-primary)" }}>Views — Last 30 Days</h3>
+            <div className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Total: {formatNumber(SAMPLE_ANALYTICS.slice(-30).reduce((s, d) => s + d.views, 0))} views
+            </div>
+          </div>
+          <MiniChart data={SAMPLE_ANALYTICS} />
+          <div className="flex justify-between text-xs mt-2" style={{ color: "var(--text-muted)" }}>
+            <span>{SAMPLE_ANALYTICS[SAMPLE_ANALYTICS.length - 30]?.date?.slice(5)}</span>
+            <span>{SAMPLE_ANALYTICS[SAMPLE_ANALYTICS.length - 1]?.date?.slice(5)}</span>
+          </div>
+        </div>
+
         {/* Per-platform cards */}
         <div className="grid gap-4 mb-6" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))" }}>
           {connectedPlatforms.map(([platform, data]) => {
@@ -153,7 +236,7 @@ export default function AnalyticsPage() {
             if (platform === "instagram") {
               stats.push(
                 { label: "Followers", value: data.followers ?? 0 },
-                { label: "Posts", value: data.posts ?? 0 },
+                { label: "Posts",     value: data.posts ?? 0 },
               );
             }
             if (platform === "facebook") {
@@ -163,14 +246,14 @@ export default function AnalyticsPage() {
               stats.push(
                 { label: "Subscribers", value: data.subscribers ?? 0 },
                 { label: "Total Views", value: data.totalViews ?? 0 },
-                { label: "Videos", value: data.videoCount ?? 0 },
+                { label: "Videos",      value: data.videoCount ?? 0 },
               );
             }
             if (platform === "tiktok") {
               stats.push(
-                { label: "Followers", value: data.followers ?? 0 },
+                { label: "Followers",   value: data.followers ?? 0 },
                 { label: "Total Likes", value: data.likes ?? 0 },
-                { label: "Videos", value: data.videos ?? 0 },
+                { label: "Videos",      value: data.videos ?? 0 },
               );
             }
 
@@ -186,7 +269,7 @@ export default function AnalyticsPage() {
                       {data.username ? `@${data.username}` : data.displayName || "Connected"}
                     </div>
                   </div>
-                  <span className="badge badge-green ml-auto">Live</span>
+                  <span className="badge badge-green ml-auto">{isDemo ? "Demo" : "Live"}</span>
                 </div>
                 <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(stats.length, 3)},1fr)` }}>
                   {stats.map(s => <StatBox key={s.label} label={s.label} value={s.value} />)}
@@ -196,41 +279,52 @@ export default function AnalyticsPage() {
           })}
         </div>
 
-        {/* Instagram recent media */}
-        {analytics.instagram?.recentMedia && analytics.instagram.recentMedia.length > 0 && (
-          <div className="card p-5 mb-6">
-            <h3 className="font-bold mb-4" style={{ color: "var(--text-primary)" }}>
-              📸 Recent Instagram Posts
-            </h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 10 }}>
-              {analytics.instagram.recentMedia.slice(0, 6).map(item => (
-                <div key={item.id} style={{ borderRadius: 10, overflow: "hidden", background: "var(--surface-2)", border: "1px solid var(--border)" }}>
-                  {(item.media_url || item.thumbnail_url) ? (
-                    <img
-                      src={item.media_url || item.thumbnail_url}
-                      alt={item.caption?.slice(0, 40) || "Post"}
-                      style={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }}
-                    />
-                  ) : (
-                    <div style={{ width: "100%", aspectRatio: "1", background: "var(--surface-3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32 }}>📷</div>
-                  )}
-                  <div style={{ padding: "8px 10px" }}>
-                    <p className="text-xs truncate" style={{ color: "var(--text-secondary)", marginBottom: 4 }}>
-                      {item.caption?.slice(0, 60) || "(no caption)"}
-                    </p>
-                    <div className="flex gap-3 text-xs" style={{ color: "var(--text-muted)" }}>
-                      <span>❤ {formatNumber(item.like_count ?? 0)}</span>
-                      <span>💬 {formatNumber(item.comments_count ?? 0)}</span>
-                    </div>
+        {/* Top content performance */}
+        <div className="card p-5 mb-6">
+          <h3 className="font-bold mb-4" style={{ color: "var(--text-primary)" }}>
+            🏆 Top Performing Content
+          </h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {SAMPLE_CONTENT.filter(c => c.status === "published").slice(0, 5).map((item, idx) => (
+              <div key={item.id} className="flex items-center gap-4 p-3 rounded-xl" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: idx === 0 ? "#f59e0b" : idx === 1 ? "#94a3b8" : idx === 2 ? "#cd7f32" : "var(--surface-3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 900, color: idx < 3 ? "#000" : "var(--text-muted)", flexShrink: 0 }}>
+                  #{idx + 1}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="text-sm font-semibold" style={{ color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {item.title}
+                  </div>
+                  <div className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    {item.platforms.map(p => PLATFORM_STYLE[p]?.icon ?? "📱").join(" ")} · {item.category}
                   </div>
                 </div>
-              ))}
-            </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>{formatNumber(item.views ?? 0)}</div>
+                  <div className="text-xs" style={{ color: "var(--text-muted)" }}>views</div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0, minWidth: 48 }}>
+                  <div className="text-sm font-bold" style={{ color: (item.viralScore ?? 0) >= 90 ? "#f59e0b" : "var(--text-muted)" }}>
+                    {item.viralScore}
+                  </div>
+                  <div className="text-xs" style={{ color: "var(--text-muted)" }}>viral</div>
+                </div>
+              </div>
+            ))}
           </div>
-        )}
+        </div>
 
         {/* Connect more platforms nudge */}
-        {connectedPlatforms.length < 4 && (
+        {isDemo && (
+          <div className="card p-5" style={{ background: "rgba(108,99,255,0.05)", border: "1px solid rgba(108,99,255,0.2)", textAlign: "center" }}>
+            <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: 12 }}>
+              Connect your real social accounts to replace this demo data with your live analytics.
+            </p>
+            <a href="/platforms" className="btn btn-gradient" style={{ textDecoration: "none", display: "inline-flex" }}>
+              Connect Platforms →
+            </a>
+          </div>
+        )}
+        {!isDemo && connectedPlatforms.length < 4 && (
           <div className="card p-5" style={{ background: "rgba(108,99,255,0.05)", border: "1px solid rgba(108,99,255,0.2)", textAlign: "center" }}>
             <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: 12 }}>
               Connect more platforms to see all your analytics in one place.
