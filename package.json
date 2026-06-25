@@ -10,10 +10,14 @@
   "dependencies": {
     "@anthropic-ai/sdk": "latest",
     "@tailwindcss/postcss": "^4.2.2",
+    "@types/leaflet": "^1.9.21",
+    "dexie": "^4.4.4",
     "facebook-nodejs-business-sdk": "latest",
+    "leaflet": "^1.9.4",
     "next": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "react-leaflet": "^5.0.0"
   },
   "devDependencies": {
     "@types/node": "latest",

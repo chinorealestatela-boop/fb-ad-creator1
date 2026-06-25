@@ -241,6 +241,12 @@ export default function Home() {
           </div>
           <span className="text-sm font-semibold text-white">Ad Creator</span>
           <a
+            href="/door-knocking"
+            className="ml-3 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-700 hover:bg-blue-600 transition-colors"
+          >
+            🚪 Door Knocking
+          </a>
+          <a
             href="/api/facebook/connect"
             className="ml-3 px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
             style={{ background: "var(--accent)" }}

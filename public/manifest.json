@@ -1,0 +1,37 @@
+{
+  "name": "Door Knocking CRM",
+  "short_name": "DoorKnock",
+  "description": "Real estate door knocking CRM with GPS, maps, and lead tracking",
+  "start_url": "/door-knocking",
+  "display": "standalone",
+  "background_color": "#0f0f0f",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "New Lead",
+      "url": "/door-knocking/lead/new",
+      "description": "Create a new lead"
+    },
+    {
+      "name": "Map View",
+      "url": "/door-knocking/map",
+      "description": "View all knocked houses on map"
+    }
+  ]
+}
