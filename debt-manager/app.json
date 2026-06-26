@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "DebtManager",
+    "slug": "debt-manager",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0A0F"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.debtmanager.app",
+      "infoPlist": {
+        "NSCalendarsUsageDescription": "Used to create payment reminders in your Apple Calendar.",
+        "NSFaceIDUsageDescription": "Used to securely unlock your financial data.",
+        "UIBackgroundModes": ["remote-notification"]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A0A0F"
+      },
+      "package": "com.debtmanager.app",
+      "permissions": ["USE_FINGERPRINT", "USE_BIOMETRIC", "RECEIVE_BOOT_COMPLETED", "VIBRATE"]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#6C63FF",
+          "sounds": []
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow DebtManager to use Face ID to unlock your financial data."
+        }
+      ],
+      "expo-calendar",
+      "expo-secure-store"
+    ],
+    "scheme": "debtmanager",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
