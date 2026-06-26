@@ -18,6 +18,7 @@ const ACTIVITY_ICONS: Record<string, string> = {
   photo: '📷',
   status_change: '🔄',
   follow_up_set: '📅',
+  follow_up_completed: '✅',
   call: '📞',
   text: '💬',
   email: '✉️',
@@ -105,23 +106,63 @@ export default function ActivityTimeline({ leadId }: Props) {
 
           const a = item.activity;
           const icon = ACTIVITY_ICONS[a.type] || '•';
+          const isCompletion = a.type === 'follow_up_completed';
+
           return (
             <div key={`a-${a.id ?? i}`} className="flex gap-3 pl-1">
-              <div className="w-8 h-8 rounded-full bg-gray-800 border border-gray-600 flex items-center justify-center text-sm shrink-0 z-10">
+              <div className={`w-8 h-8 rounded-full border flex items-center justify-center text-sm shrink-0 z-10 ${
+                isCompletion
+                  ? 'bg-green-900/50 border-green-700'
+                  : 'bg-gray-800 border-gray-600'
+              }`}>
                 {icon}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-gray-400">{formatDate(a.timestamp)}</p>
-                <p className="text-sm text-white capitalize">
-                  {a.type.replace(/_/g, ' ')}
-                </p>
-                {a.data?.note != null && (
-                  <p className="text-sm text-gray-300 mt-1">{String(a.data.note)}</p>
-                )}
-                {a.data?.from != null && a.data?.to != null && (
-                  <p className="text-xs text-gray-400">
-                    {STATUS_LABELS[String(a.data.from) as LeadStatus]} → {STATUS_LABELS[String(a.data.to) as LeadStatus]}
-                  </p>
+
+                {isCompletion ? (
+                  <>
+                    <p className="text-sm text-white font-medium">
+                      {String(a.data.followUpType ?? 'follow-up').replace(/_/g, ' ')} completed
+                    </p>
+                    {a.data.outcomeLabel != null && (
+                      <p className="text-sm text-green-400 mt-0.5">
+                        Outcome: {String(a.data.outcomeLabel)}
+                      </p>
+                    )}
+                    {a.data.notes != null && String(a.data.notes) && (
+                      <p className="text-sm text-gray-300 mt-1">{String(a.data.notes)}</p>
+                    )}
+                    {a.data.statusChanged && a.data.fromStatus != null && a.data.toStatus != null && (
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Status: {STATUS_LABELS[String(a.data.fromStatus) as LeadStatus]} → {STATUS_LABELS[String(a.data.toStatus) as LeadStatus]}
+                      </p>
+                    )}
+                    {a.data.newFollowUpAt != null && (
+                      <p className="text-xs text-blue-400 mt-0.5">
+                        📅 New follow-up: {new Date(String(a.data.newFollowUpAt)).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-white capitalize">
+                      {a.type.replace(/_/g, ' ')}
+                    </p>
+                    {a.data?.note != null && (
+                      <p className="text-sm text-gray-300 mt-1">{String(a.data.note)}</p>
+                    )}
+                    {a.data?.scheduledAt != null && (
+                      <p className="text-xs text-blue-400 mt-0.5">
+                        {new Date(String(a.data.scheduledAt)).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                      </p>
+                    )}
+                    {a.data?.from != null && a.data?.to != null && (
+                      <p className="text-xs text-gray-400">
+                        {STATUS_LABELS[String(a.data.from) as LeadStatus]} → {STATUS_LABELS[String(a.data.to) as LeadStatus]}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </div>

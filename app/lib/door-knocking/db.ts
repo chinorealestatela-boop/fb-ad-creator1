@@ -1,10 +1,11 @@
 import Dexie, { Table } from 'dexie';
-import type { Lead, Visit, Activity } from './types';
+import type { Lead, Visit, Activity, FollowUp } from './types';
 
 class DoorKnockingDB extends Dexie {
   leads!: Table<Lead, number>;
   visits!: Table<Visit, number>;
   activities!: Table<Activity, number>;
+  followUps!: Table<FollowUp, number>;
 
   constructor() {
     super('DoorKnockingCRM');
@@ -12,6 +13,10 @@ class DoorKnockingDB extends Dexie {
       leads: '++id, address, lat, lng, status, city, neighborhood, lastVisitDate, followUpDate, createdAt, updatedAt, synced',
       visits: '++id, leadId, timestamp',
       activities: '++id, leadId, type, timestamp',
+    });
+    // Version 2: adds followUps table; existing tables unchanged
+    this.version(2).stores({
+      followUps: '++id, leadId, scheduledAt, completed, type, createdAt',
     });
   }
 }
@@ -76,7 +81,50 @@ export async function deleteLead(id: number): Promise<void> {
     db.leads.delete(id),
     db.visits.where('leadId').equals(id).delete(),
     db.activities.where('leadId').equals(id).delete(),
+    db.followUps.where('leadId').equals(id).delete(),
   ]);
+}
+
+// ── Follow-Up helpers ─────────────────────────────────────────
+
+export async function saveFollowUp(fu: Omit<FollowUp, 'id'> & { id?: number }): Promise<number> {
+  const db = getDb();
+  const now = Date.now();
+  if (fu.id) {
+    await db.followUps.update(fu.id, fu);
+    return fu.id;
+  }
+  return db.followUps.add({ ...fu, createdAt: fu.createdAt ?? now });
+}
+
+export async function getFollowUp(id: number): Promise<FollowUp | undefined> {
+  return getDb().followUps.get(id);
+}
+
+export async function getFollowUpsByLead(leadId: number): Promise<FollowUp[]> {
+  return getDb().followUps
+    .where('leadId').equals(leadId)
+    .sortBy('scheduledAt');
+}
+
+export async function getAllPendingFollowUps(): Promise<FollowUp[]> {
+  const all = await getDb().followUps
+    .where('completed').equals(0)
+    .sortBy('scheduledAt');
+  return all;
+}
+
+export async function markFollowUpComplete(
+  id: number,
+  outcome: import('./types').OutcomeType,
+  outcomeNotes?: string
+): Promise<void> {
+  await getDb().followUps.update(id, {
+    completed: true,
+    completedAt: new Date().toISOString(),
+    outcome,
+    outcomeNotes,
+  });
 }
 
 export function haversineDistanceFt(

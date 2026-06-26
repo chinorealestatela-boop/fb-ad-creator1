@@ -3,21 +3,22 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { getLead, saveLead, recordVisit, addActivity, deleteLead } from '@/app/lib/door-knocking/db';
-import type { Lead, LeadStatus, PropertyOwnerInfo } from '@/app/lib/door-knocking/types';
+import { getLead, saveLead, recordVisit, addActivity, deleteLead, getFollowUpsByLead, saveFollowUp } from '@/app/lib/door-knocking/db';
+import type { Lead, LeadStatus, PropertyOwnerInfo, FollowUp } from '@/app/lib/door-knocking/types';
 import { STATUS_LABELS } from '@/app/lib/door-knocking/types';
 import { fetchPropertyOwnerInfo } from '@/app/lib/door-knocking/property';
 import StatusBadge from '@/app/components/door-knocking/StatusBadge';
 import PropertyOwnerInfoCard from '@/app/components/door-knocking/PropertyOwnerInfo';
 import ActivityTimeline from '@/app/components/door-knocking/ActivityTimeline';
 import NearbyLeads from '@/app/components/door-knocking/NearbyLeads';
+import FollowUpList from '@/app/components/door-knocking/FollowUpList';
 
 const LeafletMap = dynamic(
   () => import('@/app/components/door-knocking/LeafletMap'),
   { ssr: false }
 );
 
-type Tab = 'details' | 'nearby' | 'timeline';
+type Tab = 'details' | 'followups' | 'nearby' | 'timeline';
 
 export default function LeadDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -26,6 +27,7 @@ export default function LeadDetailPage() {
 
   const [lead, setLead] = useState<Lead | null>(null);
   const [ownerInfo, setOwnerInfo] = useState<PropertyOwnerInfo | null>(null);
+  const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [tab, setTab] = useState<Tab>('details');
   const [editing, setEditing] = useState(false);
   const [editStatus, setEditStatus] = useState<LeadStatus>('no_answer');
@@ -49,6 +51,7 @@ export default function LeadDetailPage() {
       setEditEmail(l.email || '');
       setEditFollowUp(l.followUpDate || '');
       setLoading(false);
+      getFollowUpsByLead(leadId).then(setFollowUps);
 
       // Load owner info
       if (l.address) {
@@ -65,6 +68,7 @@ export default function LeadDetailPage() {
     setSaving(true);
     const now = Date.now();
     const prevStatus = lead.status;
+    const prevFollowUpDate = lead.followUpDate;
 
     const updated: Lead = {
       ...lead,
@@ -86,6 +90,26 @@ export default function LeadDetailPage() {
         timestamp: now,
         data: { from: prevStatus, to: editStatus },
       });
+    }
+
+    // Create new follow-up entry when date changes
+    if (editFollowUp && editFollowUp !== prevFollowUpDate) {
+      const fuId = await saveFollowUp({
+        leadId: lead.id!,
+        leadAddress: lead.address,
+        type: 'follow_up',
+        scheduledAt: editFollowUp,
+        completed: false,
+        createdAt: now,
+      });
+      await addActivity({
+        leadId: lead.id!,
+        type: 'follow_up_set',
+        timestamp: now,
+        data: { scheduledAt: editFollowUp, type: 'follow_up' },
+      });
+      const updatedFUs = await getFollowUpsByLead(lead.id!);
+      setFollowUps(updatedFUs);
     }
 
     setLead(updated);
@@ -200,17 +224,25 @@ export default function LeadDetailPage() {
 
       {/* Tabs */}
       <div className="flex border-b border-gray-800 mt-4 px-4">
-        {(['details', 'nearby', 'timeline'] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex-1 py-2.5 text-sm font-medium capitalize transition-colors border-b-2 ${
-              tab === t ? 'border-blue-500 text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-300'
-            }`}
-          >
-            {t}
-          </button>
-        ))}
+        {(['details', 'followups', 'nearby', 'timeline'] as Tab[]).map((t) => {
+          const pendingCount = t === 'followups' ? followUps.filter((f) => !f.completed).length : 0;
+          return (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`flex-1 py-2.5 text-xs font-medium transition-colors border-b-2 relative ${
+                tab === t ? 'border-blue-500 text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {t === 'followups' ? 'Follow-Ups' : t.charAt(0).toUpperCase() + t.slice(1)}
+              {pendingCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-yellow-500 text-black text-[9px] font-bold flex items-center justify-center">
+                  {pendingCount}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div className="px-4 pt-4">
@@ -243,8 +275,8 @@ export default function LeadDetailPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1.5">Follow-Up Date</label>
-                  <input type="date" value={editFollowUp} onChange={(e) => setEditFollowUp(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500" />
+                  <label className="block text-xs text-gray-400 mb-1.5">Follow-Up Date & Time</label>
+                  <input type="datetime-local" value={editFollowUp} onChange={(e) => setEditFollowUp(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500" />
                 </div>
                 <button
                   onClick={handleSave}
@@ -273,8 +305,19 @@ export default function LeadDetailPage() {
                   )}
                   {lead.followUpDate && (
                     <div className="rounded-xl bg-yellow-950/30 border border-yellow-800/40 p-3">
-                      <p className="text-xs text-yellow-400 mb-1">Follow-Up Scheduled</p>
-                      <p className="text-sm text-white">{new Date(lead.followUpDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+                      <p className="text-xs text-yellow-400 mb-1">Next Follow-Up</p>
+                      <p className="text-sm text-white">
+                        {new Date(lead.followUpDate).toLocaleString('en-US', {
+                          weekday: 'long', month: 'long', day: 'numeric',
+                          hour: 'numeric', minute: '2-digit',
+                        })}
+                      </p>
+                      <button
+                        onClick={() => setTab('followups')}
+                        className="text-xs text-yellow-400 mt-1 hover:text-yellow-300 transition-colors"
+                      >
+                        View all follow-ups →
+                      </button>
                     </div>
                   )}
                   {lead.photos?.length ? (
@@ -302,6 +345,21 @@ export default function LeadDetailPage() {
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {/* Follow-Ups Tab */}
+        {tab === 'followups' && lead.id && (
+          <div className="space-y-4">
+            <FollowUpList
+              followUps={followUps}
+              leads={new Map([[lead.id, lead]])}
+              showAddress={false}
+              onUpdated={(updatedLead) => {
+                setLead(updatedLead);
+                getFollowUpsByLead(lead.id!).then(setFollowUps);
+              }}
+            />
           </div>
         )}
 

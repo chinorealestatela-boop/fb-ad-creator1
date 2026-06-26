@@ -84,10 +84,62 @@ export type ActivityType =
   | 'photo'
   | 'status_change'
   | 'follow_up_set'
+  | 'follow_up_completed'
   | 'call'
   | 'text'
   | 'email'
   | 'appointment';
+
+export type FollowUpType = 'follow_up' | 'appointment';
+
+export type OutcomeType =
+  | 'not_home'
+  | 'reschedule'
+  | 'schedule_follow_up'
+  | 'appointment_set'
+  | 'sold'
+  | 'not_interested'
+  | 'left_information'
+  | 'callback_requested'
+  | 'other';
+
+export const OUTCOME_LABELS: Record<OutcomeType, string> = {
+  not_home: 'Not Home',
+  reschedule: 'Reschedule',
+  schedule_follow_up: 'Schedule Follow-Up',
+  appointment_set: 'Appointment Set',
+  sold: 'Sold',
+  not_interested: 'Not Interested',
+  left_information: 'Left Information',
+  callback_requested: 'Requested Callback',
+  other: 'Other',
+};
+
+export const OUTCOME_ICONS: Record<OutcomeType, string> = {
+  not_home: '🚫',
+  reschedule: '🔄',
+  schedule_follow_up: '📅',
+  appointment_set: '🗓️',
+  sold: '🎉',
+  not_interested: '👎',
+  left_information: '📋',
+  callback_requested: '📞',
+  other: '📝',
+};
+
+export interface FollowUp {
+  id?: number;
+  leadId: number;
+  leadAddress?: string;
+  type: FollowUpType;
+  scheduledAt: string; // ISO datetime "2025-06-20T14:30"
+  notes?: string;
+  completed: boolean;
+  completedAt?: string;
+  outcome?: OutcomeType;
+  outcomeNotes?: string;
+  createdAt: number;
+}
 
 export interface Activity {
   id?: number;

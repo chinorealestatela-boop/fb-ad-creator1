@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { saveLead, recordVisit, addActivity } from '@/app/lib/door-knocking/db';
+import { saveLead, recordVisit, addActivity, saveFollowUp } from '@/app/lib/door-knocking/db';
 import { fetchPropertyOwnerInfo } from '@/app/lib/door-knocking/property';
 import type { Lead, LeadStatus, GpsCoordinates, PropertyOwnerInfo } from '@/app/lib/door-knocking/types';
 import GpsLocationButton from './GpsLocationButton';
@@ -93,7 +93,7 @@ export default function LeadForm({ initial, gpsCoords, mode = 'create', onSaved 
 
   async function handleSave() {
     if (!form.address.trim()) return;
-    if (!coords?.lat && !initial?.lat) return;
+    // lat/lng default to 0,0 for manually-entered addresses without GPS
 
     setSaving(true);
     const now = Date.now();
@@ -133,6 +133,25 @@ export default function LeadForm({ initial, gpsCoords, mode = 'create', onSaved 
         type: 'note',
         timestamp: now,
         data: { note: notes },
+      });
+    }
+
+    // Create a FollowUp row if a date+time was set
+    if (leadData.followUpDate) {
+      await saveFollowUp({
+        leadId: id,
+        leadAddress: leadData.address,
+        type: 'follow_up',
+        scheduledAt: leadData.followUpDate,
+        notes: notes || undefined,
+        completed: false,
+        createdAt: now,
+      });
+      await addActivity({
+        leadId: id,
+        type: 'follow_up_set',
+        timestamp: now,
+        data: { scheduledAt: leadData.followUpDate, type: 'follow_up' },
       });
     }
 
@@ -239,11 +258,11 @@ export default function LeadForm({ initial, gpsCoords, mode = 'create', onSaved 
         </div>
       </div>
 
-      {/* Follow-up date */}
+      {/* Follow-up date & time */}
       <div>
-        <label className="block text-xs text-gray-400 mb-1.5">Follow-Up Date</label>
+        <label className="block text-xs text-gray-400 mb-1.5">Follow-Up Date & Time</label>
         <input
-          type="date"
+          type="datetime-local"
           value={form.followUpDate || ''}
           onChange={(e) => setForm((f) => ({ ...f, followUpDate: e.target.value }))}
           className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
