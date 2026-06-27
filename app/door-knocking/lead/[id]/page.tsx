@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -40,6 +40,51 @@ export default function LeadDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Swipe-between-leads state
+  const [leadList, setLeadList] = useState<number[]>([]);
+  const [leadIndex, setLeadIndex] = useState(-1);
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  // Read the ordered lead list saved by the leads-list page
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem('dk_lead_list');
+      if (stored) {
+        const ids = JSON.parse(stored) as number[];
+        setLeadList(ids);
+        setLeadIndex(ids.indexOf(leadId));
+      }
+    } catch {}
+  }, [leadId]);
+
+  const goToPrev = useCallback(() => {
+    if (leadIndex <= 0) return;
+    router.push(`/door-knocking/lead/${leadList[leadIndex - 1]}`);
+  }, [leadIndex, leadList, router]);
+
+  const goToNext = useCallback(() => {
+    if (leadIndex === -1 || leadIndex >= leadList.length - 1) return;
+    router.push(`/door-knocking/lead/${leadList[leadIndex + 1]}`);
+  }, [leadIndex, leadList, router]);
+
+  function onTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  }
+
+  function onTouchEnd(e: React.TouchEvent) {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    touchStartX.current = null;
+    touchStartY.current = null;
+    // Only navigate on clearly horizontal swipes (≥60px, more horizontal than vertical)
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    if (dx < 0) goToNext();
+    else goToPrev();
+  }
+
   useEffect(() => {
     if (!leadId) return;
     getLead(leadId).then((l) => {
@@ -53,7 +98,6 @@ export default function LeadDetailPage() {
       setLoading(false);
       getFollowUpsByLead(leadId).then(setFollowUps);
 
-      // Load owner info
       if (l.address) {
         setOwnerInfo({ currentOwnerName: '', previousOwners: [], loading: true });
         fetchPropertyOwnerInfo(l.address, l.lat, l.lng)
@@ -92,9 +136,8 @@ export default function LeadDetailPage() {
       });
     }
 
-    // Create new follow-up entry when date changes
     if (editFollowUp && editFollowUp !== prevFollowUpDate) {
-      const fuId = await saveFollowUp({
+      await saveFollowUp({
         leadId: lead.id!,
         leadAddress: lead.address,
         type: 'follow_up',
@@ -155,12 +198,20 @@ export default function LeadDetailPage() {
 
   if (!lead) return null;
 
+  const hasList = leadList.length > 1 && leadIndex !== -1;
+  const canGoPrev = hasList && leadIndex > 0;
+  const canGoNext = hasList && leadIndex < leadList.length - 1;
+
   return (
-    <main className="min-h-screen bg-[var(--bg)] text-[var(--foreground)] pb-24 max-w-lg mx-auto">
+    <main
+      className="min-h-screen bg-[var(--bg)] text-[var(--foreground)] pb-24 max-w-lg mx-auto"
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
       {/* Header */}
       <div className="bg-gray-900 border-b border-gray-800 px-4 pt-4 pb-3">
         <div className="flex items-center gap-3 mb-3">
-          <Link href="/door-knocking" className="text-gray-400 hover:text-white transition-colors">
+          <Link href="/door-knocking" className="text-gray-400 hover:text-white transition-colors shrink-0">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
@@ -169,9 +220,45 @@ export default function LeadDetailPage() {
             <h1 className="font-bold text-white text-sm leading-tight">{lead.address}</h1>
             {lead.city && <p className="text-xs text-gray-400">{lead.city}</p>}
           </div>
+
+          {/* Prev / position / Next */}
+          {hasList && (
+            <div className="flex items-center gap-0.5 shrink-0">
+              <button
+                onClick={goToPrev}
+                disabled={!canGoPrev}
+                className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
+                  canGoPrev
+                    ? 'text-gray-300 hover:bg-gray-700 active:bg-gray-600'
+                    : 'text-gray-600'
+                }`}
+                title="Previous lead"
+              >
+                ‹
+              </button>
+              <span className="text-xs text-gray-500 tabular-nums px-0.5">
+                {leadIndex + 1}/{leadList.length}
+              </span>
+              <button
+                onClick={goToNext}
+                disabled={!canGoNext}
+                className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
+                  canGoNext
+                    ? 'text-gray-300 hover:bg-gray-700 active:bg-gray-600'
+                    : 'text-gray-600'
+                }`}
+                title="Next lead"
+              >
+                ›
+              </button>
+            </div>
+          )}
+
           <button
             onClick={() => setEditing(!editing)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${editing ? 'bg-gray-700 text-white' : 'bg-blue-600/20 border border-blue-700/50 text-blue-300'}`}
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors shrink-0 ${
+              editing ? 'bg-gray-700 text-white' : 'bg-blue-600/20 border border-blue-700/50 text-blue-300'
+            }`}
           >
             {editing ? 'Cancel' : 'Edit'}
           </button>

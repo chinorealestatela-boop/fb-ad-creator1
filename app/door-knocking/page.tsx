@@ -49,6 +49,17 @@ export default function DoorKnockingDashboard() {
     return true;
   });
 
+  // Save the current filtered lead order to sessionStorage so the detail page
+  // can navigate prev/next without going back to this list.
+  function saveLeadList() {
+    try {
+      sessionStorage.setItem(
+        'dk_lead_list',
+        JSON.stringify(filtered.map((l) => l.id).filter(Boolean))
+      );
+    } catch {}
+  }
+
   const stats: Record<LeadStatus, number> = {
     new: 0, no_answer: 0, follow_up: 0, interested: 0,
     appointment_set: 0, not_interested: 0, listing_signed: 0,
@@ -233,6 +244,7 @@ export default function DoorKnockingDashboard() {
                 <Link
                   key={lead.id}
                   href={`/door-knocking/lead/${lead.id}`}
+                  onClick={saveLeadList}
                   className="block rounded-2xl p-4 border border-gray-700 bg-gray-800/40 hover:bg-gray-800 transition-colors"
                 >
                   <div className="flex items-start justify-between gap-2 mb-2">
