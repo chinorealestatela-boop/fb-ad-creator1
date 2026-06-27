@@ -1,4 +1,5 @@
 import * as Notifications from 'expo-notifications';
+import { SchedulableTriggerInputTypes } from 'expo-notifications';
 import { Bill } from '../store/types';
 import { parseISO, addDays, differenceInDays } from './dateUtils';
 
@@ -42,6 +43,7 @@ export async function scheduleRemindersForBill(bill: Bill, reminderDays: number[
         sound: true,
       },
       trigger: {
+        type: SchedulableTriggerInputTypes.DATE,
         date: reminderDate,
       },
     });

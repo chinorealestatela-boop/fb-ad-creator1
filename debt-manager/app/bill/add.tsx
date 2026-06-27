@@ -19,6 +19,7 @@ const BILL_TYPES: { id: BillType; label: string; description: string }[] = [
 
 export default function AddBillScreen() {
   const addBill = useBillsStore(s => s.addBill);
+  const addNote = useBillsStore(s => s.addNote);
 
   const [name, setName] = useState('');
   const [creditor, setCreditor] = useState('');
@@ -68,7 +69,7 @@ export default function AddBillScreen() {
     const parsedTotal = totalInstallments ? parseInt(totalInstallments) : undefined;
     const parsedRemaining = remainingInstallments ? parseInt(remainingInstallments) : parsedTotal;
 
-    await addBill({
+    const newBill = await addBill({
       name: name.trim(),
       creditor: creditor.trim() || name.trim(),
       type,
@@ -90,7 +91,7 @@ export default function AddBillScreen() {
     });
 
     if (notes.trim()) {
-      // Note will be added after creation via store
+      await addNote(newBill.id, notes.trim());
     }
 
     router.back();
