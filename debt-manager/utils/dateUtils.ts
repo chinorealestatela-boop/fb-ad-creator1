@@ -38,15 +38,15 @@ export function format(date: Date, fmt: string): string {
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return fmt
+    .replace('yyyy', String(date.getFullYear()))
+    .replace('yy', String(date.getFullYear()).slice(2))
     .replace('MMMM', fullMonths[date.getMonth()])
     .replace('MMM', months[date.getMonth()])
     .replace('MM', pad(date.getMonth() + 1))
-    .replace('M', String(date.getMonth() + 1))
+    .replace('ddd', days[date.getDay()])
     .replace('dd', pad(date.getDate()))
     .replace('d', String(date.getDate()))
-    .replace('ddd', days[date.getDay()])
-    .replace('yyyy', String(date.getFullYear()))
-    .replace('yy', String(date.getFullYear()).slice(2))
+    .replace('M', String(date.getMonth() + 1))
     .replace('HH', pad(date.getHours()))
     .replace('mm', pad(date.getMinutes()));
 }
