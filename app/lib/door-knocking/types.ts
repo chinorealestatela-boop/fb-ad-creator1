@@ -42,12 +42,16 @@ export interface PropertyOwnerInfo {
   error?: string;
 }
 
+export type LeadPriority = 'high' | 'medium' | 'low';
+
 export interface Lead {
   id?: number;
   address: string;
   lat: number;
   lng: number;
   status: LeadStatus;
+  priority?: LeadPriority;
+  tags?: string[];
   ownerName?: string;
   deedYear?: number;
   previousOwners?: string[];
@@ -132,7 +136,7 @@ export interface FollowUp {
   leadId: number;
   leadAddress?: string;
   type: FollowUpType;
-  scheduledAt: string; // ISO datetime "2025-06-20T14:30"
+  scheduledAt: string;
   notes?: string;
   completed: boolean;
   completedAt?: string;

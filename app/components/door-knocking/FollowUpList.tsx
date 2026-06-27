@@ -4,13 +4,12 @@ import { useRouter } from 'next/navigation';
 import type { FollowUp, Lead } from '@/app/lib/door-knocking/types';
 import { OUTCOME_LABELS } from '@/app/lib/door-knocking/types';
 import OutcomeModal from './OutcomeModal';
+import QuickReview from './QuickReview';
 
 interface Props {
   followUps: FollowUp[];
   leads: Map<number, Lead>;
-  /** Called after an outcome is saved so the parent can reload data */
   onUpdated: (updatedLead: Lead) => void;
-  /** Show address column (dashboard view) vs compact (lead-detail view) */
   showAddress?: boolean;
 }
 
@@ -33,7 +32,10 @@ function formatScheduledAt(iso: string): string {
     d.getDate() === tomorrow.getDate();
   if (isTomorrow) return `Tomorrow · ${timeStr}`;
 
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ` · ${timeStr}`;
+  return (
+    d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
+    ` · ${timeStr}`
+  );
 }
 
 function urgencyClass(iso: string, completed: boolean): string {
@@ -69,6 +71,7 @@ export default function FollowUpList({
   const router = useRouter();
   const [activeModal, setActiveModal] = useState<{ followUp: FollowUp; lead: Lead } | null>(null);
   const [tab, setTab] = useState<SortMode>('upcoming');
+  const [showQuickReview, setShowQuickReview] = useState(false);
 
   const now = new Date();
 
@@ -120,6 +123,18 @@ export default function FollowUpList({
         ))}
       </div>
 
+      {/* Quick Review button — only in overdue tab with items */}
+      {tab === 'overdue' && counts.overdue > 0 && (
+        <button
+          onClick={() => setShowQuickReview(true)}
+          className="w-full mb-3 py-3 rounded-xl bg-blue-600/15 border border-blue-600/30 text-blue-300 text-sm font-semibold hover:bg-blue-600/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+        >
+          <span>⚡</span>
+          <span>Quick Review Mode</span>
+          <span className="text-blue-400/60 text-xs font-normal">— {counts.overdue} leads</span>
+        </button>
+      )}
+
       {displayed.length === 0 ? (
         <p className="text-center text-gray-500 text-sm py-6">
           {tab === 'upcoming' && 'No upcoming follow-ups.'}
@@ -133,7 +148,10 @@ export default function FollowUpList({
             return (
               <div
                 key={fu.id}
-                className={`rounded-xl border p-3 transition-colors ${urgencyClass(fu.scheduledAt, fu.completed)}`}
+                className={`rounded-xl border p-3 transition-colors ${urgencyClass(
+                  fu.scheduledAt,
+                  fu.completed
+                )}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
@@ -146,11 +164,13 @@ export default function FollowUpList({
                       </button>
                     )}
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        fu.type === 'appointment'
-                          ? 'bg-green-900/50 text-green-300 border border-green-700/40'
-                          : 'bg-blue-900/40 text-blue-300 border border-blue-700/40'
-                      }`}>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          fu.type === 'appointment'
+                            ? 'bg-green-900/50 text-green-300 border border-green-700/40'
+                            : 'bg-blue-900/40 text-blue-300 border border-blue-700/40'
+                        }`}
+                      >
                         {fu.type === 'appointment' ? '🗓️ Appointment' : '📅 Follow-Up'}
                       </span>
                       {urgencyLabel(fu.scheduledAt, fu.completed)}
@@ -191,6 +211,16 @@ export default function FollowUpList({
           lead={activeModal.lead}
           onDone={handleModalDone}
           onCancel={() => setActiveModal(null)}
+        />
+      )}
+
+      {/* Quick Review Overlay */}
+      {showQuickReview && (
+        <QuickReview
+          followUps={tabData.overdue}
+          leads={leads}
+          onClose={() => setShowQuickReview(false)}
+          onUpdated={onUpdated}
         />
       )}
     </div>
