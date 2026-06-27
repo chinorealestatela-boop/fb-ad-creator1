@@ -2,10 +2,16 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { getLeadsNear, haversineDistanceFt } from '@/app/lib/door-knocking/db';
+import {
+  getLeadsNear,
+  haversineDistanceFt,
+  saveFollowUp,
+  saveLead,
+} from '@/app/lib/door-knocking/db';
 import type { Lead, LeadStatus } from '@/app/lib/door-knocking/types';
 import { STATUS_LABELS, STATUS_COLORS } from '@/app/lib/door-knocking/types';
 import StatusBadge from './StatusBadge';
+import RouteOptimizer from './RouteOptimizer';
 
 const LeafletMap = dynamic(
   () => import('./LeafletMap'),
@@ -34,6 +40,13 @@ interface Props {
   showRadiusSelector?: boolean;
 }
 
+function defaultFollowUpDate(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T10:00`;
+}
+
 export default function NearbyLeads({ lat, lng, excludeLeadId }: Props) {
   const router = useRouter();
   const [radius, setRadius] = useState<MileRadius>(2);
@@ -44,6 +57,15 @@ export default function NearbyLeads({ lat, lng, excludeLeadId }: Props) {
   const [loading, setLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  // schedule follow-up
+  const [schedulingId, setSchedulingId] = useState<number | null>(null);
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleNote, setScheduleNote] = useState('');
+  const [scheduleSaved, setScheduleSaved] = useState<number | null>(null);
+
+  // route optimizer overlay
+  const [routeOpen, setRouteOpen] = useState(false);
 
   const loadNearby = useCallback(async () => {
     setLoading(true);
@@ -60,6 +82,25 @@ export default function NearbyLeads({ lat, lng, excludeLeadId }: Props) {
   }, [lat, lng, radius, excludeLeadId]);
 
   useEffect(() => { loadNearby(); }, [loadNearby]);
+
+  async function handleSchedule(lead: Lead) {
+    if (!lead.id || !scheduleDate) return;
+    const isoDate = new Date(scheduleDate).toISOString();
+    await saveFollowUp({
+      leadId: lead.id,
+      leadAddress: lead.address,
+      type: 'follow_up',
+      scheduledAt: isoDate,
+      notes: scheduleNote || undefined,
+      completed: false,
+      createdAt: Date.now(),
+    });
+    await saveLead({ ...lead, followUpDate: scheduleDate, updatedAt: Date.now() });
+    setSchedulingId(null);
+    setScheduleSaved(lead.id);
+    setTimeout(() => setScheduleSaved(null), 2500);
+    await loadNearby();
+  }
 
   const now = new Date();
 
@@ -116,13 +157,64 @@ export default function NearbyLeads({ lat, lng, excludeLeadId }: Props) {
     window.open(`https://maps.google.com/?q=${encodeURIComponent(address)}`, '_blank');
   }
 
+  function openMultiStopRoute() {
+    const stops = sorted.map((r) => r.lead).filter((l) => l.lat !== 0 && l.lng !== 0);
+    if (!stops.length) return;
+    const origin = `${lat},${lng}`;
+    const waypoints = stops.map((l) => encodeURIComponent(l.address));
+    window.open(
+      `https://www.google.com/maps/dir/${origin}/${waypoints.join('/')}`,
+      '_blank'
+    );
+  }
+
   const statusCounts: Partial<Record<LeadStatus, number>> = {};
   allNearby.forEach(({ lead }) => {
     statusCounts[lead.status] = (statusCounts[lead.status] ?? 0) + 1;
   });
 
+  const routeLeads = sorted.map((r) => r.lead).filter((l) => l.lat !== 0 && l.lng !== 0);
+
   return (
     <div className="space-y-3">
+      {/* Route optimizer overlay */}
+      {routeOpen && (
+        <div className="fixed inset-0 z-[4000] bg-gray-950 flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800 shrink-0">
+            <div>
+              <h2 className="text-base font-semibold text-white">Optimize Route</h2>
+              <p className="text-xs text-gray-500">{routeLeads.length} stops within {radius} mi</p>
+            </div>
+            <button
+              onClick={() => setRouteOpen(false)}
+              className="text-gray-400 hover:text-white text-xl leading-none p-1"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <RouteOptimizer
+              leads={routeLeads}
+              originLat={lat}
+              originLng={lng}
+              onLeadSelect={(lead) => {
+                setRouteOpen(false);
+                setExpandedId(lead.id ?? null);
+                setViewMode('list');
+              }}
+            />
+            {routeLeads.length >= 2 && (
+              <button
+                onClick={openMultiStopRoute}
+                className="w-full py-3 bg-green-900/30 border border-green-700/40 text-green-300 rounded-xl text-sm font-medium hover:bg-green-900/50 active:scale-95 transition-all"
+              >
+                🗺 Open Full Route in Google Maps
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Radius + View toggle */}
       <div className="flex items-center gap-2">
         <div className="flex gap-1.5 flex-1">
@@ -253,6 +345,16 @@ export default function NearbyLeads({ lat, lng, excludeLeadId }: Props) {
         ))}
       </div>
 
+      {/* Route optimizer shortcut */}
+      {!loading && sorted.length >= 2 && (
+        <button
+          onClick={() => setRouteOpen(true)}
+          className="w-full py-2.5 rounded-xl bg-indigo-900/30 border border-indigo-700/40 text-indigo-300 text-sm font-medium hover:bg-indigo-900/50 active:scale-95 transition-all"
+        >
+          🗺 Optimize Driving Route &mdash; {sorted.length} stops
+        </button>
+      )}
+
       {/* Map View */}
       {viewMode === 'map' && (
         <div className="space-y-2">
@@ -353,6 +455,7 @@ export default function NearbyLeads({ lat, lng, excludeLeadId }: Props) {
               {sorted.map(({ lead, distanceFt }) => {
                 const isExpanded = expandedId === lead.id;
                 const overdueFollowUp = lead.followUpDate && new Date(lead.followUpDate) < now;
+                const isScheduling = schedulingId === lead.id;
                 return (
                   <div
                     key={lead.id}
@@ -441,6 +544,8 @@ export default function NearbyLeads({ lat, lng, excludeLeadId }: Props) {
                         {lead.notes && (
                           <p className="text-xs text-gray-400 italic">&ldquo;{lead.notes}&rdquo;</p>
                         )}
+
+                        {/* Quick action grid */}
                         <div className="grid grid-cols-4 gap-1.5">
                           <button
                             onClick={() => router.push(`/door-knocking/lead/${lead.id}`)}
@@ -485,6 +590,54 @@ export default function NearbyLeads({ lat, lng, excludeLeadId }: Props) {
                             Nav
                           </button>
                         </div>
+
+                        {/* Schedule Follow-Up */}
+                        {scheduleSaved === lead.id ? (
+                          <p className="text-xs text-green-400 text-center py-1">✓ Follow-up scheduled!</p>
+                        ) : isScheduling ? (
+                          <div className="space-y-2 pt-0.5">
+                            <p className="text-xs text-gray-400 font-medium">Schedule Follow-Up</p>
+                            <input
+                              type="datetime-local"
+                              value={scheduleDate}
+                              onChange={(e) => setScheduleDate(e.target.value)}
+                              className="w-full bg-gray-800 border border-gray-600 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500"
+                            />
+                            <input
+                              type="text"
+                              placeholder="Note (optional)"
+                              value={scheduleNote}
+                              onChange={(e) => setScheduleNote(e.target.value)}
+                              className="w-full bg-gray-800 border border-gray-600 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500"
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleSchedule(lead)}
+                                disabled={!scheduleDate}
+                                className="flex-1 py-2 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 text-black rounded-xl text-xs font-bold transition-colors active:scale-95"
+                              >
+                                Save Follow-Up
+                              </button>
+                              <button
+                                onClick={() => setSchedulingId(null)}
+                                className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-xl text-xs transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setSchedulingId(lead.id ?? null);
+                              setScheduleDate(defaultFollowUpDate());
+                              setScheduleNote('');
+                            }}
+                            className="w-full py-2 rounded-xl bg-yellow-900/20 border border-yellow-700/30 text-yellow-300 text-xs font-medium hover:bg-yellow-900/40 active:scale-95 transition-all"
+                          >
+                            📅 Schedule Follow-Up
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
