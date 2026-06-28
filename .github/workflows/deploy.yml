@@ -1,0 +1,50 @@
+name: Deploy DebtManager PWA
+
+on:
+  push:
+    branches: [ "claude/debt-budgeting-app-design-tdi2dz" ]
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: debt-manager/package-lock.json
+
+      - name: Install dependencies
+        working-directory: debt-manager
+        run: npm install --legacy-peer-deps
+
+      - name: Build web app
+        working-directory: debt-manager
+        run: npx expo export --platform web
+
+      - name: Add PWA support files
+        working-directory: debt-manager
+        run: |
+          cp pwa-assets/sw.js dist/
+          cp pwa-assets/manifest.json dist/
+          cp pwa-assets/icon-192.png dist/
+          cp pwa-assets/icon-512.png dist/
+          cp pwa-assets/apple-touch-icon.png dist/
+          cp pwa-assets/favicon.ico dist/
+          touch dist/.nojekyll
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: debt-manager/dist
+          force_orphan: true
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'Deploy DebtManager PWA'
