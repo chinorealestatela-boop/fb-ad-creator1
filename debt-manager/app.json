@@ -29,7 +29,8 @@
       "permissions": ["USE_FINGERPRINT", "USE_BIOMETRIC", "RECEIVE_BOOT_COMPLETED", "VIBRATE"]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     },
     "plugins": [
       "expo-router",
@@ -53,7 +54,8 @@
     ],
     "scheme": "debtmanager",
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "baseUrl": "/fb-ad-creator1"
     }
   }
 }
