@@ -18,6 +18,7 @@ export default function BillDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const getBillById = useBillsStore(s => s.getBillById);
   const logPayment = useBillsStore(s => s.logPayment);
+  const markPaid = useBillsStore(s => s.markPaid);
   const addNote = useBillsStore(s => s.addNote);
   const deleteNote = useBillsStore(s => s.deleteNote);
   const deleteBill = useBillsStore(s => s.deleteBill);
@@ -85,13 +86,22 @@ export default function BillDetailScreen() {
   };
 
   const handleMarkPaid = () => {
-    Alert.alert('Mark as Paid', `Mark "${bill.name}" as fully paid off?`, [
+    const isRecurring = bill.type === 'recurring';
+    const message = isRecurring
+      ? `Log this month's payment for "${bill.name}"?\n\nThe bill will reset automatically for next month.`
+      : `Mark "${bill.name}" as paid?\n\nThis bill will be removed from your list.`;
+
+    Alert.alert('Mark as Paid', message, [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Mark Paid', onPress: async () => {
-          await updateBill(bill.id, { status: 'paid', paidAt: new Date().toISOString() });
-          router.back();
-        }
+        text: 'Mark Paid',
+        onPress: async () => {
+          const { deleted } = await markPaid(bill.id);
+          if (deleted) {
+            router.back();
+          }
+          // For recurring, stay on screen so user can see the updated (reset) due date
+        },
       },
     ]);
   };

@@ -14,6 +14,7 @@ interface BillsState {
   updateBill: (id: string, updates: Partial<Bill>) => Promise<void>;
   deleteBill: (id: string) => Promise<void>;
   logPayment: (billId: string, payment: Omit<Payment, 'id'>) => Promise<void>;
+  markPaid: (billId: string) => Promise<{ deleted: boolean }>;
   addNote: (billId: string, text: string) => Promise<void>;
   deleteNote: (billId: string, noteId: string) => Promise<void>;
   refreshStatuses: () => void;
@@ -129,7 +130,7 @@ export const useBillsStore = create<BillsState>((set, get) => ({
         : b.remainingInstallments;
 
       let nextDue = b.nextDueDate;
-      if (b.type === 'recurring' && b.dueDay) {
+      if (b.type === 'recurring') {
         nextDue = addMonths(parseISO(b.nextDueDate), 1).toISOString();
       }
 
@@ -146,6 +147,28 @@ export const useBillsStore = create<BillsState>((set, get) => ({
     });
     set({ bills });
     await persist(bills);
+  },
+
+  markPaid: async (billId) => {
+    const bill = get().getBillById(billId);
+    if (!bill) return { deleted: false };
+
+    const amount = bill.currentPayment || bill.minimumPayment || bill.amount;
+
+    await get().logPayment(billId, {
+      date: new Date().toISOString(),
+      amount,
+      notes: 'Marked as paid',
+    });
+
+    if (bill.type !== 'recurring') {
+      await get().deleteBill(billId);
+      return { deleted: true };
+    }
+
+    // Recurring: logPayment already advanced nextDueDate by 1 month.
+    // computeStatus will now return 'current' (or similar) — no permanent 'paid' flag.
+    return { deleted: false };
   },
 
   addNote: async (billId, text) => {
