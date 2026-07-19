@@ -96,11 +96,14 @@ export default function BillDetailScreen() {
       {
         text: 'Mark Paid',
         onPress: async () => {
-          const { deleted } = await markPaid(bill.id);
-          if (deleted) {
-            router.back();
+          try {
+            const { deleted } = await markPaid(bill.id);
+            if (deleted) {
+              router.back();
+            }
+          } catch (err) {
+            Alert.alert('Error', 'Could not mark as paid. Please try again.');
           }
-          // For recurring, stay on screen so user can see the updated (reset) due date
         },
       },
     ]);

@@ -39,6 +39,26 @@ jobs:
           cp pwa-assets/favicon.ico dist/
           touch dist/.nojekyll
 
+      - name: Patch index.html for SW-triggered reload
+        working-directory: debt-manager
+        run: |
+          python3 - <<'PYEOF'
+          with open('dist/index.html', 'r') as f:
+              html = f.read()
+          listener = (
+              "navigator.serviceWorker.addEventListener('message',function(e){"
+              "if(e.data&&e.data.type==='SW_UPDATED')window.location.reload();"
+              "});"
+          )
+          html = html.replace(
+              "navigator.serviceWorker.register(",
+              listener + "navigator.serviceWorker.register("
+          )
+          with open('dist/index.html', 'w') as f:
+              f.write(html)
+          print('Patched index.html with SW reload listener')
+          PYEOF
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
