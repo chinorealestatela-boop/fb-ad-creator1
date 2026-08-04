@@ -47,6 +47,7 @@ export interface Bill {
   createdAt: string;
   updatedAt: string;
   paidAt?: string;
+  paidForMonth?: string;
   attachments?: string[];
 }
 

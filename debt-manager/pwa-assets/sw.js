@@ -1,4 +1,4 @@
-const CACHE = 'debtmanager-v3';
+const CACHE = 'debtmanager-v4';
 const BASE = '/fb-ad-creator1';
 
 self.addEventListener('install', e => {

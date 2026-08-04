@@ -88,8 +88,8 @@ export default function BillDetailScreen() {
   const handleMarkPaid = () => {
     const isRecurring = bill.type === 'recurring';
     const message = isRecurring
-      ? `Log this month's payment for "${bill.name}"?\n\nThe bill will reset automatically for next month.`
-      : `Mark "${bill.name}" as paid?\n\nThis bill will be removed from your list.`;
+      ? `Log this month's payment for "${bill.name}"?\n\nIt will be marked paid and reset next month.`
+      : `Mark "${bill.name}" as paid?\n\nThis will be removed from your active bills.`;
 
     Alert.alert('Mark as Paid', message, [
       { text: 'Cancel', style: 'cancel' },
@@ -97,10 +97,8 @@ export default function BillDetailScreen() {
         text: 'Mark Paid',
         onPress: async () => {
           try {
-            const { deleted } = await markPaid(bill.id);
-            if (deleted) {
-              router.back();
-            }
+            await markPaid(bill.id);
+            router.back();
           } catch (err) {
             Alert.alert('Error', 'Could not mark as paid. Please try again.');
           }

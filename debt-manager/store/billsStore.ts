@@ -26,8 +26,13 @@ interface BillsState {
   getTotalBalance: () => number;
 }
 
+function getCurrentMonthKey(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
 function computeStatus(bill: Bill): import('./types').BillStatus {
-  if (bill.status === 'paid') return 'paid';
+  if (bill.paidForMonth === getCurrentMonthKey()) return 'paid';
   const today = new Date();
   const due = parseISO(bill.nextDueDate);
   const daysUntil = differenceInDays(due, today);
@@ -68,7 +73,9 @@ export const useBillsStore = create<BillsState>((set, get) => ({
     try {
       const raw = await AsyncStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const bills: Bill[] = JSON.parse(raw);
+        let bills: Bill[] = JSON.parse(raw);
+        // Migrate: remove old permanently-paid non-recurring bills (should have been deleted)
+        bills = bills.filter(b => !(b.status === 'paid' && b.type !== 'recurring' && !b.paidForMonth));
         const refreshed = bills.map(b => ({ ...b, status: computeStatus(b) }));
         set({ bills: refreshed, isLoaded: true });
       } else {
@@ -155,20 +162,52 @@ export const useBillsStore = create<BillsState>((set, get) => ({
 
     const amount = bill.currentPayment || bill.minimumPayment || bill.amount;
 
-    await get().logPayment(billId, {
-      date: new Date().toISOString(),
-      amount,
-      notes: 'Marked as paid',
-    });
-
-    if (bill.type !== 'recurring') {
-      await get().deleteBill(billId);
+    if (bill.type === 'recurring') {
+      const monthKey = getCurrentMonthKey();
+      const payment: Payment = {
+        id: `pmt_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        date: new Date().toISOString(),
+        amount,
+        notes: `Paid for ${monthKey}`,
+      };
+      const bills = get().bills.map(b => {
+        if (b.id !== billId) return b;
+        const nextDue = addMonths(parseISO(b.nextDueDate), 1).toISOString();
+        const updated: Bill = {
+          ...b,
+          paidForMonth: monthKey,
+          nextDueDate: nextDue,
+          paymentHistory: [payment, ...b.paymentHistory],
+          updatedAt: new Date().toISOString(),
+        };
+        updated.status = computeStatus(updated);
+        return updated;
+      });
+      set({ bills });
+      await persist(bills);
+      return { deleted: false };
+    } else {
+      // Non-recurring (one-time, installment, payment-plan): log payment then delete
+      const payment: Payment = {
+        id: `pmt_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        date: new Date().toISOString(),
+        amount,
+        notes: 'Marked as paid - completed',
+      };
+      const withPayment = get().bills.map(b => {
+        if (b.id !== billId) return b;
+        return {
+          ...b,
+          paymentHistory: [payment, ...b.paymentHistory],
+          balance: b.balance !== undefined ? 0 : b.balance,
+          updatedAt: new Date().toISOString(),
+        };
+      });
+      const afterDelete = withPayment.filter(b => b.id !== billId);
+      set({ bills: afterDelete });
+      await persist(afterDelete);
       return { deleted: true };
     }
-
-    // Recurring: logPayment already advanced nextDueDate by 1 month.
-    // computeStatus will now return 'current' (or similar) — no permanent 'paid' flag.
-    return { deleted: false };
   },
 
   addNote: async (billId, text) => {
