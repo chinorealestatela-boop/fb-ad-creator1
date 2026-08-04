@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  Alert, TextInput, Modal, KeyboardAvoidingView, Platform,
+  TextInput, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,6 +33,19 @@ export default function BillDetailScreen() {
   const [payMethod, setPayMethod] = useState('');
   const [payNote, setPayNote] = useState('');
   const [noteText, setNoteText] = useState('');
+  const [confirm, setConfirm] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    danger: boolean;
+    onConfirm: () => void;
+  }>({ visible: false, title: '', message: '', confirmLabel: 'Confirm', danger: false, onConfirm: () => {} });
+
+  const showConfirm = (title: string, message: string, confirmLabel: string, danger: boolean, onConfirm: () => void) => {
+    setConfirm({ visible: true, title, message, confirmLabel, danger, onConfirm });
+  };
+  const hideConfirm = () => setConfirm(c => ({ ...c, visible: false }));
 
   if (!bill) {
     return (
@@ -74,37 +87,32 @@ export default function BillDetailScreen() {
   };
 
   const handleDeleteBill = () => {
-    Alert.alert('Delete Bill', `Are you sure you want to delete "${bill.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive', onPress: async () => {
-          await deleteBill(bill.id);
-          router.back();
-        }
-      },
-    ]);
+    showConfirm(
+      'Delete Bill',
+      `Delete "${bill.name}"? This cannot be undone.`,
+      'Delete',
+      true,
+      async () => {
+        await deleteBill(bill.id);
+        router.back();
+      }
+    );
   };
 
   const handleMarkPaid = () => {
     const isRecurring = bill.type === 'recurring';
-    const message = isRecurring
-      ? `Log this month's payment for "${bill.name}"?\n\nIt will be marked paid and reset next month.`
-      : `Mark "${bill.name}" as paid?\n\nThis will be removed from your active bills.`;
-
-    Alert.alert('Mark as Paid', message, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Mark Paid',
-        onPress: async () => {
-          try {
-            await markPaid(bill.id);
-            router.back();
-          } catch (err) {
-            Alert.alert('Error', 'Could not mark as paid. Please try again.');
-          }
-        },
-      },
-    ]);
+    showConfirm(
+      'Mark as Paid',
+      isRecurring
+        ? `Mark "${bill.name}" paid for this month? It will automatically reset next month.`
+        : `Mark "${bill.name}" as paid? It will be removed from your active bills.`,
+      'Mark Paid',
+      false,
+      async () => {
+        await markPaid(bill.id);
+        router.back();
+      }
+    );
   };
 
   const totalPaid = bill.paymentHistory.reduce((s, p) => s + p.amount, 0);
@@ -331,6 +339,27 @@ export default function BillDetailScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Confirm Modal (replaces Alert.alert — works reliably on iOS Safari/PWA) */}
+      <Modal visible={confirm.visible} transparent animationType="fade">
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmSheet}>
+            <Text style={styles.confirmTitle}>{confirm.title}</Text>
+            <Text style={styles.confirmMessage}>{confirm.message}</Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity style={styles.confirmCancelBtn} onPress={hideConfirm}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmOkBtn, confirm.danger && styles.confirmDangerBtn]}
+                onPress={() => { hideConfirm(); confirm.onConfirm(); }}
+              >
+                <Text style={styles.saveText}>{confirm.confirmLabel}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -450,6 +479,15 @@ const styles = StyleSheet.create({
   paymentDate: { color: Colors.textMuted, fontSize: 12 },
   paymentMethod: { color: Colors.textSecondary, fontSize: 12 },
   paymentNote: { color: Colors.textSecondary, fontSize: 12, fontStyle: 'italic' },
+
+  confirmOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.7)', padding: 24 },
+  confirmSheet: { backgroundColor: Colors.surface, borderRadius: 20, padding: 24, width: '100%', gap: 16 },
+  confirmTitle: { color: Colors.text, fontSize: 20, fontWeight: '700' },
+  confirmMessage: { color: Colors.textSecondary, fontSize: 15, lineHeight: 22 },
+  confirmActions: { flexDirection: 'row', gap: 12, marginTop: 4 },
+  confirmCancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: Colors.card, alignItems: 'center' },
+  confirmOkBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: Colors.primary, alignItems: 'center' },
+  confirmDangerBtn: { backgroundColor: Colors.danger },
 
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.7)' },
   modalSheet: { backgroundColor: Colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, gap: 14 },
